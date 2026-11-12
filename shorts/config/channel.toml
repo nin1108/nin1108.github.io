@@ -1,0 +1,45 @@
+# チャンネル運用設定（秘密情報は書かない。OAuthの鍵とトークンは ~/.config/shorts-youtube/ に置く）
+
+[channel]
+name = "宇宙を知る"
+handle = "@knowspace1004"
+# 投稿先チャンネルID（UC で始まる）。未設定なら private/schedule 投稿は保留される。
+# OAuth で認証されたチャンネルとこの値が一致しない場合も投稿しない。
+channel_id = ""
+
+[genre]
+# 初期ジャンル。変更可。各回の企画メモ(plan.md)はこのジャンル名を記録する。
+current = "3Dで見る、もしも科学"
+description = "宇宙・物理・身近な現象を、立体の動き・断面・スケール比較・観測位置による見え方の違いで、問いの答えを映像として見せる"
+audience = "中高生〜一般"
+
+[format]
+width = 1080
+height = 1920
+fps = 30            # 速い動きで見やすさが改善し、レンダー予算に収まる回だけ 60
+target_seconds = [30, 45]
+
+[publish]
+# local: 制作のみ（初期値） / private: 非公開アップロード / schedule: 公開予約
+mode = "local"
+timezone = "Asia/Tokyo"
+# 投稿枠（仮説。変更可）。曜日は mon..sun
+slots = [{ weekday = "wed", time = "20:30" }, { weekday = "sun", time = "20:30" }]
+# 予約は現在時刻からこの時間以上先の枠だけを使う
+min_lead_hours = 3
+notify_subscribers = true
+category_id = "28"          # Science & Technology
+default_language = "ja"
+made_for_kids = false       # 視聴者設定（子ども向けではない）。各回 metadata.json で上書き可
+
+[cost]
+# 有料API・生成サービス・クラウド課金は初期設定で無効
+allow_paid_services = false
+
+[tts]
+# ローカルの VOICEVOX ENGINE（http://127.0.0.1:50021）があれば使う。
+engine = "voicevox"
+url = "http://127.0.0.1:50021"
+speaker_name = "青山龍星"
+style_name = "ノーマル"
+speed = 1.12

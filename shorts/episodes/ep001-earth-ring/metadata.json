@@ -1,0 +1,21 @@
+{
+  "title": "もし地球に土星みたいな輪があったら？東京と赤道で見え方が全然ちがう",
+  "title_candidates": [
+    "もし地球に土星みたいな輪があったら？東京と赤道で見え方が全然ちがう",
+    "地球に輪があったら、赤道では「線」になる？3Dで確かめた",
+    "同じ輪なのに見え方がちがう？地球に輪があったら"
+  ],
+  "description": "もし地球に、土星と同じ比率の輪があったら？\n同じ輪でも、北緯35°（東京付近）では南の空に大きな帯のアーチ、赤道では真上を東西に横切る細い線に見えます。赤道の人は輪と同じ面の中にいて、輪を真横から見ることになるからです。\nBlenderで地球・輪・観測地点を3Dで置き、同じカメラ設定で見比べました。\n\n■この動画の仮定（仮想シミュレーションです）\n・輪は地球の赤道面にある薄い円環\n・内縁と外縁は、土星の主な輪（C環内縁〜A環外縁）の惑星半径比 1.24〜2.27倍を地球に当てはめた（地表からの高さ 約1,500〜8,100km）\n・6月下旬・地方時16時ごろ、目の高さ1.6m、地球は球として計算\n・北緯35°で輪のいちばん高い所は約33°（計算値。3Dの投影と照合済み）\n・現実の地球に輪ができる条件は扱っていません\n\n■見やすさのための誇張\n・地上から見た輪の厚み（線の太さ）を8kmに誇張しています（実際の土星の主な輪の厚さは約10m級）\n・断面図の輪の厚み、宇宙から見た地点マーカーも拡大表示です\n\n■参考資料\n・NASA Saturn Facts https://science.nasa.gov/saturn/facts/\n・NASA Saturn's Rings https://science.nasa.gov/resource/saturns-rings-2/\n・NASA APOD: Crossing Saturn's Ring Plane https://science.nasa.gov/image-article/apod-2025-november-16-crossing-saturns-ring-plane/\n・Miller et al. (2023) The composition of Saturn's rings https://arxiv.org/abs/2311.17344\n・NASA Earth Facts https://science.nasa.gov/earth/facts/\n\n■クレジット\n・地球の画像: NASA Blue Marble Next Generation（NASA Earth Observatory / Visible Earth）\n・3DCG: Blender で制作（自作シーン）\n・BGM・効果音: 自作\n・フォント: IPAフォント（IPA Pゴシック）\n・企画・台本の整理にAIを補助的に使用しています。映像はBlenderの3DCGです。\n\n#もしも科学 #宇宙 #地球 #土星 #3DCG #Shorts",
+  "tags": ["もしも科学", "宇宙", "地球", "土星", "土星の輪", "3DCG", "Blender", "天文", "Shorts"],
+  "made_for_kids": false,
+  "ai_disclosure": {
+    "contains_synthetic_media": false,
+    "reason": "映像は生成AIではなくBlenderの3DCG（手続き的に作成）で、画面と説明欄に『仮想シミュレーション』と明記。実在の人物・実際の出来事の映像の改変もない。YouTubeヘルプ（answer/14328491）の開示対象（リアルなAI生成・改変コンテンツ）に当たらないと判断。AIは企画・台本の整理の補助のみで、ヘルプ上は開示不要の制作支援に該当",
+    "decided_by": "制作パイプライン既定値（運用者が変更可）",
+    "decided_at": "2026-11-12"
+  },
+  "audience": "中高生〜一般",
+  "narration": "なし（字幕＋自作BGM/効果音）。VOICEVOX使用時は説明欄に『VOICEVOX:青山龍星』を追加",
+  "thumbnail": "output/thumbnail_1080x1920.jpg",
+  "captions": "output/ep001.ja.srt"
+}

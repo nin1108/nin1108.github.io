@@ -1,0 +1,167 @@
+{
+  "id": "ep001-earth-ring",
+  "title_working": "もし地球に土星みたいな輪ができたら？",
+  "fps": 30,
+  "resolution": [
+    1080,
+    1920
+  ],
+  "duration_s": 40.0,
+  "science": {
+    "earth_radius_km": 6378.137,
+    "ring_inner_ratio": 1.24,
+    "ring_outer_ratio": 2.27,
+    "ring_profile_note": "土星の主な輪（C環内縁〜A環外縁）を土星半径比のまま地球半径に当てはめた仮定",
+    "ring_render_thickness_km": 8.0,
+    "ring_real_thickness_reference_m": 10,
+    "observers": {
+      "mid": {
+        "lat": 35.0,
+        "lon": 139.7,
+        "label": "北緯35°（東京付近）"
+      },
+      "eq": {
+        "lat": 0.0,
+        "lon": 139.7,
+        "label": "赤道（同じ経度）"
+      }
+    },
+    "sun": {
+      "declination_deg": 23.44,
+      "hour_angle_deg": 60.0,
+      "note": "6月下旬・地方時16時ごろ（両地点で同じ時角）"
+    },
+    "camera_height_m": 1.6
+  },
+  "render": {
+    "engine": "CYCLES",
+    "preview_scale": 0.25,
+    "preview_samples": 8,
+    "final_samples": 32,
+    "denoise": true,
+    "ground_exposure": -2.5,
+    "space_exposure": 0.0,
+    "space_scale": 0.75,
+    "space_samples": 16
+  },
+  "cuts": [
+    {
+      "id": "c01_hook_mid",
+      "scene": "GROUND_MID",
+      "camera": "CAM_hook",
+      "res": [
+        1080,
+        960
+      ],
+      "frames": [
+        1,
+        1
+      ]
+    },
+    {
+      "id": "c01_hook_eq",
+      "scene": "GROUND_EQ",
+      "camera": "CAM_hook",
+      "res": [
+        1080,
+        960
+      ],
+      "frames": [
+        1,
+        1
+      ]
+    },
+    {
+      "id": "c02_space",
+      "scene": "SPACE",
+      "camera": "CAM_orbit",
+      "frames": [
+        1,
+        195
+      ]
+    },
+    {
+      "id": "c03_descent",
+      "scene": "SPACE",
+      "camera": "CAM_descent",
+      "frames": [
+        1,
+        45
+      ],
+      "hide": [
+        "MARKERS_PIN"
+      ]
+    },
+    {
+      "id": "c04_mid_ground",
+      "scene": "GROUND_MID",
+      "camera": "CAM_ground",
+      "frames": [
+        1,
+        1
+      ]
+    },
+    {
+      "id": "c05_eq_ground",
+      "scene": "GROUND_EQ",
+      "camera": "CAM_tilt",
+      "frames": [
+        1,
+        90
+      ]
+    },
+    {
+      "id": "c06_allsky_mid",
+      "scene": "GROUND_MID",
+      "camera": "CAM_allsky",
+      "res": [
+        1000,
+        1000
+      ],
+      "frames": [
+        1,
+        1
+      ]
+    },
+    {
+      "id": "c06_allsky_eq",
+      "scene": "GROUND_EQ",
+      "camera": "CAM_allsky",
+      "res": [
+        1000,
+        1000
+      ],
+      "frames": [
+        1,
+        1
+      ]
+    },
+    {
+      "id": "c07_section",
+      "scene": "SPACE",
+      "camera": "CAM_section",
+      "frames": [
+        1,
+        1
+      ],
+      "show": [
+        "SECTION"
+      ],
+      "hide": [
+        "MARKERS_PIN"
+      ]
+    },
+    {
+      "id": "c08_edgeon",
+      "scene": "SPACE",
+      "camera": "CAM_edgeon",
+      "frames": [
+        1,
+        120
+      ],
+      "hide": [
+        "MARKERS"
+      ]
+    }
+  ]
+}

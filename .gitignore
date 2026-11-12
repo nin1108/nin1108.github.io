@@ -1,0 +1,17 @@
+# Python 仮想環境（bpy などはここに入れる）
+.venv/
+__pycache__/
+# 再生成できる中間ファイル（レンダー連番・プレビュー・照合画像）
+shorts/episodes/*/build/preview/
+shorts/episodes/*/build/final/
+shorts/episodes/*/build/verify/
+shorts/episodes/*/build/*.log
+shorts/episodes/*/output/*_video_only.mp4
+shorts/episodes/*/output/*_preview_video.mp4
+shorts/episodes/*/output/*_mix.wav
+shorts/episodes/*/output/qc_ui/
+# 秘密情報（念のため。通常は ~/.config/shorts-youtube/ に置く）
+client_secret*.json
+token*.json
+*.session.json
+*.blend1

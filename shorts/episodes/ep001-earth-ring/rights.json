@@ -1,0 +1,12 @@
+{
+  "episode": "ep001-earth-ring",
+  "checked_at": "2026-11-12",
+  "items": [
+    {"asset": "3Dシーン・カメラ・図解（scene.py / edit.py）", "source": "自作", "license": "自作", "credit": "不要", "status": "ok"},
+    {"asset": "地球テクスチャ assets/textures/bluemarble_bmng.jpg", "source": "NASA Blue Marble Next Generation（PyPI basemap-data 2.0.0 同梱の bmng.jpg）", "license": "NASA画像（米国政府機関の著作物で原則著作権なし。NASAのクレジット表記、NASAによる推奨と誤認させない使い方が条件）", "credit": "説明欄に記載済み", "status": "ok", "note": "NASAの現行画像利用ページはこの環境から到達できず、検索で得たNASAガイドラインの抜粋で確認。運用者が https://www.nasa.gov/nasa-brand-center/images-and-media/ を一度確認すると確実"},
+    {"asset": "BGM・効果音（lib/audio_synth.py で合成）", "source": "自作", "license": "自作", "credit": "不要", "status": "ok"},
+    {"asset": "フォント IPA Pゴシック（ipagp.ttf）", "source": "Debian fonts-ipafont-gothic", "license": "IPAフォントライセンスv1.0（商用利用可、動画への使用可）", "credit": "説明欄に記載（任意）", "status": "ok"},
+    {"asset": "Blender 5.3（bpy）", "source": "PyPI bpy 5.3.0", "license": "GPL（制作物の映像には及ばない）", "credit": "説明欄に記載（任意）", "status": "ok"},
+    {"asset": "ナレーション", "source": "なし（VOICEVOX未使用）", "license": "-", "credit": "-", "status": "ok"}
+  ]
+}
