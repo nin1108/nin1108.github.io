@@ -1,0 +1,64 @@
+{
+  "file": "/home/user/nin1108.github.io/shorts/episodes/ep001-earth-ring/output/ep001.mp4",
+  "checks": {
+    "resolution": {
+      "value": "1080x1920",
+      "ok": true
+    },
+    "fps": {
+      "value": 30.0,
+      "ok": true
+    },
+    "duration_s": {
+      "value": 40.0,
+      "ok": true
+    },
+    "video_codec": {
+      "value": "h264/yuv420p",
+      "ok": true
+    },
+    "audio_track": {
+      "value": "aac 48000Hz ch2",
+      "ok": true
+    },
+    "av_length_diff_s": {
+      "value": 0.0,
+      "ok": true
+    },
+    "black_frames": {
+      "value": [],
+      "ok": true
+    },
+    "silence_over_1s": {
+      "value": [],
+      "ok": true
+    },
+    "loudness": {
+      "value": {
+        "integrated_lufs": -17.3,
+        "true_peak_dbfs": -1.3
+      },
+      "ok": true
+    },
+    "subtitles": {
+      "value": {
+        "count": 13,
+        "too_long": [],
+        "gaps": [],
+        "covers_until_s": 40.0
+      },
+      "ok": true
+    }
+  },
+  "ui_overlay_images": [
+    "/home/user/nin1108.github.io/shorts/episodes/ep001-earth-ring/output/qc_ui/01_hook.png",
+    "/home/user/nin1108.github.io/shorts/episodes/ep001-earth-ring/output/qc_ui/02_space.png",
+    "/home/user/nin1108.github.io/shorts/episodes/ep001-earth-ring/output/qc_ui/03_mid.png",
+    "/home/user/nin1108.github.io/shorts/episodes/ep001-earth-ring/output/qc_ui/04_eq_zenith.png",
+    "/home/user/nin1108.github.io/shorts/episodes/ep001-earth-ring/output/qc_ui/05_allsky.png",
+    "/home/user/nin1108.github.io/shorts/episodes/ep001-earth-ring/output/qc_ui/06_section.png",
+    "/home/user/nin1108.github.io/shorts/episodes/ep001-earth-ring/output/qc_ui/07_edgeon.png",
+    "/home/user/nin1108.github.io/shorts/episodes/ep001-earth-ring/output/qc_ui/08_conclusion.png"
+  ],
+  "pass": true
+}

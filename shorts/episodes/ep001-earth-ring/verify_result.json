@@ -1,0 +1,37 @@
+{
+  "method": "fisheye equidistant 180deg, diff(ring)-diff(no ring) > threshold",
+  "size": 1000,
+  "mid": {
+    "expected_outer_alt_deg": 33.43,
+    "measured_outer_alt_deg": 33.66,
+    "expected_inner_alt_deg": 1.27,
+    "measured_lower_edge_alt_deg": 1.26,
+    "px_per_deg": 5.556,
+    "note_inner": "内縁は高度約1°で、大気による減光の近似と地平線近くの解像度のため下端は粗い",
+    "measured_az_range_at_alt2_deg": [
+      112.0,
+      247.5
+    ],
+    "expected_az_range_at_alt2_deg": [
+      112.0,
+      248.0
+    ],
+    "expected_horizon_az_outer_deg": [
+      110.1,
+      249.9
+    ]
+  },
+  "eq": {
+    "expected": "天頂を通る東西の線（画像中央の水平線, 行=500）",
+    "measured_rows": [
+      498,
+      501
+    ],
+    "measured_horizontal_extent_px": [
+      0,
+      999
+    ],
+    "line_width_px": 4
+  },
+  "pass": true
+}

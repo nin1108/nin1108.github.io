@@ -183,9 +183,9 @@ class Editor:
 
     def allsky(self, t, lt, p):
         im = Image.new("RGB", (W, H), (6, 8, 16))
-        D = 600
+        D = 580
         R = D // 2
-        centers = {"mid": (W // 2, 790), "eq": (W // 2, 1420)}
+        centers = {"mid": (W // 2, 760), "eq": (W // 2, 1440)}
         for key, cut in (("mid", "c06_allsky_mid"), ("eq", "c06_allsky_eq")):
             src = self.fr.get(cut, 1, (D, D))
             mask = Image.new("L", (D, D), 0)
@@ -204,12 +204,12 @@ class Editor:
         b = C.fade_alpha(lt, 1.7, 99, 0.3)
         cx, cy = centers["mid"]
         y33 = cy + R * (90 - 33.4) / 90
-        C.arrow(im, (cx + 330, y33 - 150), (cx + 40, y33 + 30), C.ORANGE, 5, b)
-        C.tag(im, (cx + 330, y33 - 150), "帯", C.ORANGE, 44, b, anchor="mb")
+        C.arrow(im, (cx + 230, y33 - 170), (cx + 40, y33 + 30), C.ORANGE, 5, b)
+        C.tag(im, (cx + 230, y33 - 170), "帯", C.ORANGE, 44, b, anchor="mb")
         c = C.fade_alpha(lt, 2.9, 99, 0.3)
         cx, cy = centers["eq"]
-        C.arrow(im, (cx + 330, cy - 120), (cx + 160, cy - 8), C.CYAN, 5, c)
-        C.tag(im, (cx + 330, cy - 120), "線", C.CYAN, 44, c, anchor="mb")
+        C.arrow(im, (cx + 230, cy - 130), (cx + 120, cy - 8), C.CYAN, 5, c)
+        C.tag(im, (cx + 230, cy - 130), "線", C.CYAN, 44, c, anchor="mb")
         C.note(im, (W // 2, 1790), "全天カメラ（真上向き・上が北）　点線は高度30°・60°", 26, C.fade_alpha(lt, 0.3, 99), anchor="mm")
         return im
 

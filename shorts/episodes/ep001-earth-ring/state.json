@@ -1,0 +1,42 @@
+{
+  "id": "ep001-earth-ring",
+  "production": {
+    "build": {
+      "ok": true,
+      "at": "2026-11-13T01:25:07+09:00",
+      "blend": "episodes/ep001-earth-ring/build/ep001.blend"
+    },
+    "verify": {
+      "ok": true,
+      "at": "2026-11-13T01:25:07+09:00"
+    },
+    "preview": {
+      "ok": true,
+      "at": "2026-11-13T01:25:07+09:00",
+      "file": "episodes/ep001-earth-ring/output/ep001_preview.mp4"
+    },
+    "render": {
+      "ok": true,
+      "at": "2026-11-13T01:25:07+09:00",
+      "note": "地上=1080x1920(32spp,チルトは16spp)、宇宙=810x1440(16spp)を合成時に拡大"
+    },
+    "compose": {
+      "ok": true,
+      "at": "2026-11-13T01:33:29+09:00"
+    },
+    "qc": {
+      "ok": true,
+      "at": "2026-11-13T01:33:39+09:00",
+      "sha256": "5552583f0c158780d5826cfc49b932fa7769d839e3c5df3486ceeeb3c33fa6ad",
+      "file": "episodes/ep001-earth-ring/output/ep001.mp4"
+    }
+  },
+  "publish": {
+    "status": "not_uploaded",
+    "history": [],
+    "reason": "mode=local"
+  },
+  "analytics": {},
+  "updated_at": "2026-11-13T01:33:44+09:00",
+  "next_command": "（制作完了。投稿するには config/channel.toml の mode と channel_id を設定し python3 sk.py publish ep001-earth-ring）"
+}
