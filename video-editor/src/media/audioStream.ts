@@ -12,7 +12,7 @@ import { audioBufferFor, blobFor } from './registry';
 export const SAMPLE_RATE = 48000;
 export const SEG = 5; // 区間の長さ (秒)
 const FULL_DECODE_MAX_SEC = 150;
-const MAX_CACHED_SEGMENTS = 48; // 約 4 分ぶん (≒ 92MB) を上限に古いものから破棄
+const MAX_CACHED_SEGMENTS = 16; // 素材 1 本あたり 80 秒ぶん (≒ 31MB) を上限に古いものから破棄
 
 export interface PcmRange {
   buffer: AudioBuffer;
