@@ -628,16 +628,17 @@ button.mini {
 }
 .tl-tools {
   position: absolute;
-  right: calc(6px + var(--safe-r));
-  bottom: 6px;
+  right: calc(4px + var(--safe-r));
+  top: 2px;
   z-index: 9;
   display: flex;
-  gap: 4px;
+  gap: 3px;
 }
 .tl-tools .mini {
-  background: #000b;
-  min-width: 30px;
-  height: 28px;
+  background: #000d;
+  min-width: 28px;
+  height: 22px;
+  padding: 0 6px;
 }
 
 /* ---------- 詳細パネル (ボトムシート) ---------- */
@@ -1263,7 +1264,7 @@ input[type='range']::-moz-range-thumb {
 @media (orientation: landscape) and (min-width: 600px) {
   .editor {
     grid-template-columns: minmax(0, 1fr) min(420px, 42vw);
-    grid-template-rows: calc(44px + var(--safe-t)) minmax(0, 1fr) minmax(150px, 42%) calc(56px + var(--safe-b));
+    grid-template-rows: calc(44px + var(--safe-t)) minmax(0, 1fr) minmax(130px, 36%) calc(56px + var(--safe-b));
     grid-template-areas: 'top top' 'stage side' 'tl side' 'tools side';
   }
   .topbar {
@@ -1297,7 +1298,7 @@ input[type='range']::-moz-range-thumb {
 }
 @media (orientation: landscape) and (max-height: 500px) {
   .editor {
-    grid-template-rows: calc(40px + var(--safe-t)) minmax(0, 1fr) minmax(120px, 40%) calc(52px + var(--safe-b));
+    grid-template-rows: calc(40px + var(--safe-t)) minmax(0, 1fr) minmax(110px, 34%) calc(52px + var(--safe-b));
   }
   .transport {
     height: 38px;
