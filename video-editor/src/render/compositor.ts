@@ -148,10 +148,10 @@ export class Compositor {
   }
 
   // ---------- FBO プール ----------
-  private acquire(): PooledFBO {
-    let f = this.pool.find((x) => !x.busy);
+  private acquire(w = this.outW, h = this.outH): PooledFBO {
+    let f = this.pool.find((x) => !x.busy && x.w === w && x.h === h);
     if (!f) {
-      f = { ...createFBO(this.gl, this.outW, this.outH), busy: false };
+      f = { ...createFBO(this.gl, w, h), busy: false };
       this.pool.push(f);
     }
     f.busy = true;
@@ -575,14 +575,14 @@ export class Compositor {
   }
 
   // ---------- エフェクト ----------
-  private blurPass(src: FBO, sigma: number, tilt?: { focus: number; range: number; angle: number; radial: boolean }): PooledFBO {
+  /** 解像度 (w,h) での分離ガウシアンブラー */
+  private blurCore(src: FBO, sigma: number, w: number, h: number, tilt?: { focus: number; range: number; angle: number; radial: boolean }): PooledFBO {
     const gl = this.gl;
-    const a = this.acquire();
-    const b = this.acquire();
+    const a = this.acquire(w, h);
+    const b = this.acquire(w, h);
     const pr = this.useV('blur', { u_tilt: tilt ? 1 : 0 });
-    gl.uniform2f(pr.u.u_res, this.outW, this.outH);
+    gl.uniform2f(pr.u.u_res, w, h);
     gl.uniform1f(pr.u.u_sigma, sigma);
-    gl.uniform1i(pr.u.u_tilt, tilt ? 1 : 0);
     if (tilt) {
       gl.uniform1f(pr.u.u_focus, tilt.focus);
       gl.uniform1f(pr.u.u_range, tilt.range);
@@ -597,8 +597,8 @@ export class Compositor {
     gl.uniform2f(pr.u.u_dir, 0, 1);
     this.tex(0, a.tex, pr.u.u_tex);
     this.draw();
-    // 大きな半径は 2 回目の分離パスで滑らかにする
-    if (sigma > 24) {
+    // 大きな半径は斜め方向の分離パスを追加して滑らかにする
+    if (sigma > 12) {
       this.bindTarget(a);
       gl.uniform1f(pr.u.u_sigma, sigma * 0.5);
       gl.uniform2f(pr.u.u_dir, 0.7071, 0.7071);
@@ -611,6 +611,41 @@ export class Compositor {
     }
     this.release(a);
     return b;
+  }
+
+  private copyTo(src: FBO, dst: FBO) {
+    this.bindTarget(dst);
+    const pr = this.use('copy');
+    this.gl.uniform1f(pr.u.u_mul, 1);
+    this.tex(0, src.tex, pr.u.u_tex);
+    this.draw();
+  }
+
+  /**
+   * ぼかし。半径が大きい場合は 1/2・1/4 解像度に縮小してから計算し、拡大して戻す
+   * (見た目はほぼ同じで、フィルレートを 1/4〜1/16 に削減できる)。
+   */
+  private blurPass(src: FBO, sigma: number, tilt?: { focus: number; range: number; angle: number; radial: boolean }): PooledFBO {
+    const levels = sigma > 40 ? 2 : sigma > 10 ? 1 : 0;
+    if (levels === 0) return this.blurCore(src, sigma, this.outW, this.outH, tilt);
+    let cur: FBO = src;
+    let w = this.outW;
+    let h = this.outH;
+    const tmp: PooledFBO[] = [];
+    for (let i = 0; i < levels; i++) {
+      w = Math.max(1, Math.ceil(w / 2));
+      h = Math.max(1, Math.ceil(h / 2));
+      const d = this.acquire(w, h);
+      this.copyTo(cur, d);
+      tmp.push(d);
+      cur = d;
+    }
+    const blurred = this.blurCore(cur, sigma / (1 << levels), w, h, tilt);
+    for (const t of tmp) this.release(t);
+    const out = this.acquire();
+    this.copyTo(blurred, out);
+    this.release(blurred);
+    return out;
   }
 
   private fxPass(src: FBO, type: number, set: (u: Program['u']) => void, t: number): PooledFBO {
