@@ -1,6 +1,7 @@
 import { createRoot } from 'react-dom/client';
 import { App } from './App';
 import './styles.css';
+import { inArtifact } from './ui/platform';
 import * as store from './store/store';
 import * as actions from './ui/actions';
 import { engine } from './ui/engine';
@@ -20,7 +21,10 @@ document.addEventListener('dblclick', (e) => {
 window.addEventListener('error', (e) => console.error('[error]', e.error ?? e.message));
 window.addEventListener('unhandledrejection', (e) => console.error('[unhandledrejection]', e.reason));
 
-if ('serviceWorker' in navigator && location.protocol === 'https:') {
+// claude.ai の Artifact 内では Service Worker は使えず、画面端の余白はビューアー側が確保する
+if (inArtifact) document.documentElement.classList.add('in-artifact');
+
+if (!inArtifact && 'serviceWorker' in navigator && location.protocol === 'https:') {
   window.addEventListener('load', () => {
     navigator.serviceWorker.register('./sw.js').catch((e) => console.warn('SW registration failed', e));
   });

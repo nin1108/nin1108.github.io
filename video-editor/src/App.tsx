@@ -6,9 +6,12 @@ import { loadProject, requestPersistence } from './storage/db';
 import { normalizeProject } from './model/defaults';
 import { ensureFontAsset } from './media/registry';
 import { ensureWebFont } from './render/fonts';
+import { storageSet } from './ui/platform';
+import { DialogHost } from './ui/dialog';
 
 function idFromHash() {
-  const m = location.hash.match(/^#\/p\/([\w-]+)/);
+  // 埋め込み環境でも保持されるよう、ハッシュは英数字とハイフンのみ (#p-<id>)
+  const m = location.hash.match(/^#(?:p-|\/p\/)([\w-]+)/);
   return m ? m[1] : null;
 }
 
@@ -43,7 +46,7 @@ export function App() {
         if (cancelled) return;
         useStore.getState().load(p);
         void requestPersistence();
-        localStorage.setItem('mve:last', p.id);
+        storageSet('mve:last', p.id);
       } catch (e: any) {
         setError(String(e?.message ?? e));
         location.hash = '';
@@ -57,11 +60,18 @@ export function App() {
   }, [route]);
 
   if (loading) return <div className="splash">読み込み中…</div>;
-  if (route && project) return <Editor onHome={() => (location.hash = '')} />;
+  if (route && project)
+    return (
+      <>
+        <Editor onHome={() => (location.hash = '')} />
+        <DialogHost />
+      </>
+    );
   return (
     <>
+      <DialogHost />
       {error && <div className="toast error">{error}</div>}
-      <Home onOpen={(id) => (location.hash = '#/p/' + id)} />
+      <Home onOpen={(id) => (location.hash = '#p-' + id)} />
     </>
   );
 }

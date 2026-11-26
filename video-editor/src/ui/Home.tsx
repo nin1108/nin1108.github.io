@@ -6,6 +6,7 @@ import { dimsFor } from '../export/capabilities';
 import { formatTime } from '../model/ops';
 import { Icon } from './icons';
 import { decodeText } from '../model/srt';
+import { askConfirm, notify } from './dialog';
 
 const PRESET_SIZES: { label: string; sub: string; a: [number, number] }[] = [
   { label: '9:16', sub: 'Shorts / TikTok / リール', a: [9, 16] },
@@ -137,7 +138,7 @@ export function Home({ onOpen }: { onOpen: (id: string) => void }) {
                 className="mini"
                 aria-label="削除"
                 onClick={async () => {
-                  if (!confirm(`「${p.name}」を削除しますか？ この操作は取り消せません。`)) return;
+                  if (!(await askConfirm(`「${p.name}」を削除しますか？`, 'この操作は取り消せません。読み込んだ素材も、ほかのプロジェクトで使っていなければ削除されます。', { okLabel: '削除', danger: true }))) return;
                   await deleteProject(p.id);
                   void refresh();
                 }}
@@ -161,9 +162,9 @@ export function Home({ onOpen }: { onOpen: (id: string) => void }) {
             p.id = uid();
             await saveProject(p);
             void refresh();
-            alert('読み込みました。素材 (動画・画像) は含まれないため、必要に応じて再度読み込んでください。');
+            await notify('読み込みました', '素材 (動画・画像・音声) は含まれないため、必要に応じて読み込み直してください。');
           } catch {
-            alert('プロジェクトファイルを読み込めませんでした');
+            await notify('プロジェクトファイルを読み込めませんでした', 'このアプリで書き出した .json ファイルを選んでください。');
           }
         }} />
         {est && (

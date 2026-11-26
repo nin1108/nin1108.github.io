@@ -10,6 +10,7 @@ import { Icon } from '../icons';
 import { addAssetClip, addAdjustment, addCamera, addGenerated, addParticles, addShape, addText, importFiles, NarrationRecorder, addRecording } from '../actions';
 import { ACCEPT_MEDIA } from '../../media/import';
 import { formatTime } from '../../model/ops';
+import { inArtifact } from '../platform';
 
 const st = () => useStore.getState();
 
@@ -425,6 +426,11 @@ function MediaBin({ kind }: { kind?: 'audio' }) {
 
 
 function RecordBox() {
+  if (inArtifact) return <p className="hint">この画面ではマイクを使えないため録音できません。スマホのボイスメモ等で録音した音声ファイルを「BGM・効果音を読み込む」から追加してください。</p>;
+  return <RecordBoxInner />;
+}
+
+function RecordBoxInner() {
   const [rec, setRec] = useState<NarrationRecorder | null>(null);
   const [startT, setStartT] = useState(0);
   const [, force] = useState(0);

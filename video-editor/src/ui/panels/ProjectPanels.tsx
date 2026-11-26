@@ -9,6 +9,8 @@ import { exportVideo, type ExportProgress, type ExportResult } from '../../expor
 import { loadBackups, storageEstimate } from '../../storage/db';
 import { normalizeProject } from '../../model/defaults';
 import { Icon } from '../icons';
+import { askConfirm } from '../dialog';
+import { inArtifact } from '../platform';
 import { engine } from '../engine';
 
 const st = () => useStore.getState();
@@ -160,7 +162,7 @@ export function ProjectPanel() {
             <div className="fx-group-title">自動バックアップから復元</div>
             {backups.map((b, i) => (
               <button key={b.t} className="wide" onClick={async () => {
-                if (!confirm('この時点の内容に戻しますか？ (現在の内容は元に戻す操作で復帰できます)')) return;
+                if (!(await askConfirm('この時点の内容に戻しますか？', '現在の内容は「元に戻す」で復帰できます。', { okLabel: '戻す' }))) return;
                 const list = await loadBackups(project.id);
                 const bp = list[i]?.p;
                 if (bp) st().update((p) => Object.assign(p, normalizeProject({ ...bp, id: p.id })));
@@ -306,6 +308,11 @@ export function ExportPanel() {
   };
   const share = async () => {
     if (!result) return;
+    // Artifact 内では downloads 機能が iPhone の共有シートを開く
+    if (inArtifact) {
+      await downloadBlob(result.blob, result.fileName);
+      return;
+    }
     const file = new File([result.blob], result.fileName, { type: result.mime });
     try {
       if ((navigator as any).canShare?.({ files: [file] })) await navigator.share({ files: [file], title: project.name });

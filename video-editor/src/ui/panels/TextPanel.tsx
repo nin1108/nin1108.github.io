@@ -9,6 +9,7 @@ import { getMeta, putMeta } from '../../storage/db';
 import { EASE_LABELS } from '../../model/keyframes';
 import { uid } from '../../model/defaults';
 import { Icon } from '../icons';
+import { askConfirm, askText } from '../dialog';
 
 const st = () => useStore.getState();
 
@@ -199,7 +200,7 @@ export function TextPanel({ clip }: { clip: Clip }) {
   }, []);
   if (clip.type !== 'text' || !clip.text) return <div className="panel-body">テキストクリップを選択してください</div>;
   const savePreset = async () => {
-    const name = prompt('プリセット名', clip.text!.content.slice(0, 10) || 'マイテロップ');
+    const name = await askText('プリセット名', clip.text!.content.slice(0, 10) || 'マイテロップ');
     if (!name) return;
     const list = [...presets, { id: uid(), name, style: JSON.parse(JSON.stringify(clip.text!.style)), anims: JSON.parse(JSON.stringify(clip.text!.anims)) }];
     await putMeta('textPresets', list);
@@ -224,7 +225,7 @@ export function TextPanel({ clip }: { clip: Clip }) {
                 c.text!.anims = JSON.parse(JSON.stringify(pr.anims));
               })} onContextMenu={async (e) => {
                 e.preventDefault();
-                if (!confirm(`「${pr.name}」を削除しますか？`)) return;
+                if (!(await askConfirm(`プリセット「${pr.name}」を削除しますか？`, undefined, { okLabel: '削除', danger: true }))) return;
                 const list = presets.filter((x) => x.id !== pr.id);
                 await putMeta('textPresets', list);
                 setPresets(list);

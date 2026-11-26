@@ -6,6 +6,7 @@ import { importFile } from '../media/import';
 import { buildSRT, decodeText, parseSRT } from '../model/srt';
 import { PRESETS } from '../presets/presets';
 import { findClip } from './params';
+import { saveFile } from './platform';
 
 const st = () => useStore.getState();
 
@@ -272,15 +273,10 @@ export function exportSRT(): string {
   return buildSRT(cues);
 }
 
-export function downloadBlob(blob: Blob, name: string) {
-  const url = URL.createObjectURL(blob);
-  const a = document.createElement('a');
-  a.href = url;
-  a.download = name;
-  document.body.appendChild(a);
-  a.click();
-  a.remove();
-  setTimeout(() => URL.revokeObjectURL(url), 60_000);
+export async function downloadBlob(blob: Blob, name: string): Promise<boolean> {
+  const r = await saveFile(blob, name);
+  if (r.message) st().showToast(r.message, 'error');
+  return r.ok;
 }
 
 export function addEffectToSelected(type: Parameters<typeof createEffect>[0]) {
