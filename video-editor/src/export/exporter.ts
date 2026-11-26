@@ -2,7 +2,8 @@
 import type { Project } from '../model/types';
 import { Compositor } from '../render/compositor';
 import { ExportFrameSource } from '../media/video';
-import { decodeAll, renderAudioChunk, scheduleMix } from '../media/audio';
+import { audioItems, renderAudioChunk, RealtimeMix } from '../media/audio';
+import { createOutputTarget, checkSpace } from './target';
 import { ensureFontAsset, imageFor } from '../media/registry';
 import { projectDuration } from '../model/ops';
 import { fontString } from '../render/text';
@@ -38,6 +39,8 @@ export interface ExportResult {
   mime: string;
   warnings: string[];
   seconds: number;
+  /** 保存先 (opfs / opfs-worker / idb / memory) */
+  targetKind?: string;
 }
 
 async function prepareAssets(p: Project, onMsg: (m: string) => void, maxDim: number) {
@@ -56,30 +59,6 @@ async function prepareAssets(p: Project, onMsg: (m: string) => void, maxDim: num
   onMsg('画像を読み込み中…');
   const used = new Set(p.clips.filter((c) => c.type === 'image').map((c) => c.assetId));
   for (const a of p.assets) if (used.has(a.id)) await imageFor(a, maxDim);
-}
-
-async function createTarget(useOpfs: boolean, warnings: string[]) {
-  const mb = await import('mediabunny');
-  if (useOpfs) {
-    try {
-      const root = await navigator.storage.getDirectory();
-      const name = 'export-' + Date.now() + '.mp4';
-      // 以前の書き出しファイルを掃除
-      for await (const [n] of (root as any).entries()) if (String(n).startsWith('export-')) await root.removeEntry(n).catch(() => {});
-      const fh = await root.getFileHandle(name, { create: true });
-      const writable = await (fh as any).createWritable();
-      return {
-        target: new mb.StreamTarget(writable, { chunked: true, chunkSize: 8 * 1024 * 1024 }),
-        fastStart: false as const,
-        getBlob: async () => fh.getFile() as Promise<Blob>,
-      };
-    } catch (e) {
-      warnings.push('端末ストレージへの直接書き込みに失敗したため、メモリ上で書き出します');
-      console.warn(e);
-    }
-  }
-  const target = new mb.BufferTarget();
-  return { target, fastStart: 'in-memory' as const, getBlob: async () => new Blob([target.buffer!], { type: 'video/mp4' }) };
 }
 
 export async function exportVideo(p: Project, s: ExportSettings, onProgress: (pr: ExportProgress) => void, signal: AbortSignal): Promise<ExportResult> {
@@ -101,7 +80,7 @@ export async function exportVideo(p: Project, s: ExportSettings, onProgress: (pr
   if (signal.aborted) throw new DOMException('キャンセルしました', 'AbortError');
 
   // 音声コーデックの確認 (ブラウザが AAC を符号化できない場合は WASM エンコーダを使用)
-  let hasAudio = p.clips.some((c) => (c.type === 'audio' || c.type === 'video') && !c.audio.muted);
+  let hasAudio = audioItems(p).length > 0;
   if (hasAudio && !(await mb.canEncodeAudio('aac', { numberOfChannels: 2, sampleRate: 48000, bitrate: s.audioBitrate }))) {
     report('prepare', 0, 0, 'AAC エンコーダを読み込み中…');
     try {
@@ -114,19 +93,15 @@ export async function exportVideo(p: Project, s: ExportSettings, onProgress: (pr
       warnings.push('AAC 音声を符号化できないため、音声なしで書き出しました');
     }
   }
-  let buffers = new Map<string, AudioBuffer>();
-  if (hasAudio) {
-    report('audio', 0, 0, '音声をデコード中…');
-    buffers = await decodeAll(p, (d, n) => report('audio', d / Math.max(1, n), 0, `音声をデコード中… (${d}/${n})`));
-    if (buffers.size === 0) hasAudio = false;
-  }
+  const estimated = ((s.videoBitrate + (hasAudio ? s.audioBitrate : 0)) * dur) / 8;
+  const space = await checkSpace(estimated);
+  if (space) warnings.push(space);
 
   const canvas = document.createElement('canvas');
   const comp = new Compositor(canvas, { preserve: true });
   comp.setSize(s.width, s.height);
   const frames = new ExportFrameSource(true);
-  const useOpfs = dur > 45;
-  const { target, fastStart, getBlob } = await createTarget(useOpfs, warnings);
+  const { target, fastStart, getBlob, kind: targetKind } = await createOutputTarget(estimated, warnings);
   const output = new mb.Output({ format: new mb.Mp4OutputFormat({ fastStart }), target });
   const videoSource = new mb.CanvasSource(canvas, {
     codec: 'avc',
@@ -155,7 +130,7 @@ export async function exportVideo(p: Project, s: ExportSettings, onProgress: (pr
       // 音声は映像に先行して 10 秒単位で追加 (メモリ節約)
       if (audioSource && audioDone < dur && t - from + 1 / s.fps > audioDone - 0.5) {
         const len = Math.min(CHUNK, dur - audioDone);
-        const buf = await renderAudioChunk(p, buffers, from + audioDone, len, 48000);
+        const buf = await renderAudioChunk(p, from + audioDone, len, 48000);
         await audioSource.add(buf);
         audioDone += len;
       }
@@ -183,7 +158,7 @@ export async function exportVideo(p: Project, s: ExportSettings, onProgress: (pr
     }
     while (audioSource && audioDone < dur - 1e-6) {
       const len = Math.min(CHUNK, dur - audioDone);
-      await audioSource.add(await renderAudioChunk(p, buffers, from + audioDone, len, 48000));
+      await audioSource.add(await renderAudioChunk(p, from + audioDone, len, 48000));
       audioDone += len;
     }
     report('finalize', 1, totalFrames, 'ファイルを仕上げ中…');
@@ -194,7 +169,8 @@ export async function exportVideo(p: Project, s: ExportSettings, onProgress: (pr
     if (missingFrames) warnings.push(`${missingFrames} フレームで素材を読み込めず、一部のレイヤーが描画されませんでした (${[...missingNames].slice(0, 4).join('、')})`);
     if (frames.usedFallback) warnings.push('一部の動画はフレーム単位シーク方式でデコードしました (時間がかかります)');
     report('done', 1, totalFrames, '完了');
-    return { blob: blob.type ? blob : new Blob([blob], { type: 'video/mp4' }), fileName: s.fileName, mime: 'video/mp4', warnings, seconds: (performance.now() - t0) / 1000 };
+    (globalThis as any).__MVE_LAST_EXPORT__ = { targetKind, warnings };
+    return { blob: blob.type ? blob : new Blob([blob], { type: 'video/mp4' }), fileName: s.fileName, mime: 'video/mp4', warnings, seconds: (performance.now() - t0) / 1000, targetKind };
   } catch (e) {
     if (output.state !== 'canceled' && output.state !== 'finalized') await output.cancel().catch(() => {});
     throw e;
@@ -215,7 +191,6 @@ async function exportRealtime(p: Project, s: ExportSettings, onProgress: (pr: Ex
   const dur = to - from;
   const totalFrames = Math.round(dur * s.fps);
   await prepareAssets(p, () => {}, Math.max(s.width, s.height) * 2);
-  const buffers = await decodeAll(p);
   const canvas = document.createElement('canvas');
   const comp = new Compositor(canvas, { preserve: false });
   comp.setSize(s.width, s.height);
@@ -235,7 +210,7 @@ async function exportRealtime(p: Project, s: ExportSettings, onProgress: (pr: Ex
   await new Promise((r) => setTimeout(r, 800));
   await actx.resume();
   const startCtx = actx.currentTime + 0.2;
-  const mix = scheduleMix(actx, dest, p, buffers, from, to, startCtx);
+  const mix = new RealtimeMix(actx, dest, p, from, startCtx);
   rec.start(1000);
   try {
     await new Promise<void>((resolve, reject) => {

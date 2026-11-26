@@ -14,6 +14,7 @@ import { AddPanel, ChartPanel, CounterPanel, ParticlesPanel, ShapePanel, SolidPa
 import { AnimatePanel } from './panels/AnimatePanel';
 import { ExportPanel, LayersPanel, PresetsPanel, ProjectPanel } from './panels/ProjectPanels';
 import { releaseAll } from '../media/registry';
+import { releaseAudioSources } from '../media/audioStream';
 
 const st = () => useStore.getState();
 
@@ -271,6 +272,7 @@ export function Editor({ onHome }: { onHome: () => void }) {
     engine.pool.dispose();
     engine.audio.stop();
     releaseAll();
+    releaseAudioSources();
     onHome();
   };
 

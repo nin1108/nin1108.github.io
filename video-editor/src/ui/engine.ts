@@ -29,19 +29,28 @@ class PreviewEngine {
       if (s.project !== prev.project) {
         this.invalidate();
         if (s.playing && s.project && prev.project && s.project.id === prev.project.id) this.audio.reschedule(s.project);
-        if (s.project) this.audio.prepare(s.project, () => {
-          const st = useStore.getState();
-          if (st.playing && st.project) this.audio.reschedule(st.project);
-          useStore.getState().bump();
-        });
+
       }
-      if (s.time !== prev.time && !s.playing) this.invalidate();
+      if (s.time !== prev.time && !s.playing) {
+        this.invalidate();
+        this.scheduleWarm();
+      }
       if (s.previewQuality !== prev.previewQuality) this.invalidate();
       if (s.playing !== prev.playing) {
         if (s.playing) this.startPlayback();
         else this.stopPlayback();
       }
     });
+  }
+
+  private warmTimer: ReturnType<typeof setTimeout> | null = null;
+  /** 停止中にシークしたら、その位置の音声を先読みして再生開始を速くする */
+  private scheduleWarm() {
+    if (this.warmTimer) clearTimeout(this.warmTimer);
+    this.warmTimer = setTimeout(() => {
+      const s = useStore.getState();
+      if (s.project && !s.playing) this.audio.warm(s.project, s.time);
+    }, 400);
   }
 
   attach(canvas: HTMLCanvasElement) {

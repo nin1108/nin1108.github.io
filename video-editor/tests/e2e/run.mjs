@@ -24,6 +24,8 @@ const URL_BASE = process.env.APP_URL ?? 'http://localhost:4173/';
 const LONG = process.argv.includes('--long');
 // --quick: 書き出しを 720p30 にして短時間で確認する
 const QUICK = process.argv.includes('--quick');
+// --long15: 15 分・1080p30 の横型動画 (区間デコード・逐次書き込みの検証)
+const LONG15 = process.argv.includes('--long15');
 const EXP = QUICK ? { res: '720p', fps: 30, w: 720, h: 1280 } : { res: '1080p', fps: 60, w: 1080, h: 1920 };
 
 const results = [];
@@ -48,6 +50,10 @@ function genMedia() {
   if (!existsSync(f('subs.srt'))) writeFileSync(f('subs.srt'), '1\n00:00:01,000 --> 00:00:03,500\nこんにちは、字幕テストです\n\n2\n00:00:04,000 --> 00:00:06,000\n二行目の\n字幕です\n');
   if (LONG && !existsSync(f('long_h.mp4')))
     ff(['-f', 'lavfi', '-i', 'testsrc2=size=1280x720:rate=30:duration=500', '-f', 'lavfi', '-i', 'sine=frequency=330:sample_rate=48000:duration=500', '-c:v', 'libx264', '-preset', 'ultrafast', '-crf', '30', '-pix_fmt', 'yuv420p', '-c:a', 'aac', '-shortest', f('long_h.mp4')]);
+  if (LONG15 && !existsSync(f('long15.mp4')))
+    // 60 秒ごとに 1kHz のビープ (音ズレ確認用) を入れた 15 分の 1080p 動画
+    ff(['-f', 'lavfi', '-i', 'testsrc=size=1920x1080:rate=30:duration=900', '-f', 'lavfi', '-i', "aevalsrc='0.2*sin(2*PI*300*t)+0.7*sin(2*PI*1000*t)*lt(mod(t,60),0.15)':s=48000:d=900", '-c:v', 'libx264', '-preset', 'ultrafast', '-crf', '32', '-pix_fmt', 'yuv420p', '-c:a', 'aac', '-b:a', '128k', '-shortest', f('long15.mp4')]);
+  if (LONG15 && !existsSync(f('bgm15.mp3'))) ff(['-f', 'lavfi', '-i', 'aevalsrc=0.15*sin(2*PI*180*t):s=48000:d=900', '-c:a', 'libmp3lame', '-b:a', '128k', f('bgm15.mp3')]);
   return f;
 }
 
@@ -305,6 +311,10 @@ async function main() {
 
   // ---- 6〜7. 1080p 60fps で書き出し ----
   await page.evaluate(() => window.__MVE__.store.useStore.getState().select([]));
+  if (QUICK) {
+    // 端末ストレージ (OPFS) が使えない環境を想定し、IndexedDB への分割保存経路で書き出す
+    await page.evaluate(() => Object.assign(window.__MVE__.targetDebug, { disable: ['opfs', 'opfs-worker'], memoryMax: 0 }));
+  }
   const ex = await exportAndSave(page, `e2e_vertical_${EXP.res}${EXP.fps}.mp4`, { res: EXP.res, fps: EXP.fps });
   const pr = probe(ex.path);
   const v = pr.streams.find((s) => s.codec_type === 'video');
@@ -323,6 +333,11 @@ async function main() {
   check('効果音の同期 (5.0秒/15.0秒)', se1 > pre1 + 12 && se2v > pre2 + 12, `5.0s: ${se1}dB (直前 ${pre1}dB), 15.0s: ${se2v}dB (直前 ${pre2}dB)`);
   check('BGM のフェードイン', maxVolume(ex.path, 0, 0.1) < maxVolume(ex.path, 2, 0.5) - 6, `0s ${maxVolume(ex.path, 0, 0.1)}dB / 2s ${maxVolume(ex.path, 2, 0.5)}dB`);
   if (ex.warnings.length) console.log('   書き出し警告:', ex.warnings.join(' / '));
+  if (QUICK) {
+    const kind = await page.evaluate(() => window.__MVE_LAST_EXPORT__?.targetKind);
+    check('IndexedDB 分割保存での書き出し', kind === 'idb', String(kind));
+    await page.evaluate(() => Object.assign(window.__MVE__.targetDebug, { disable: [], memoryMax: 60 * 1024 * 1024 }));
+  }
   for (const t of [0.6, 5, 12.5, 16]) ff(['-ss', String(t), '-i', ex.path, '-frames:v', '1', join(OUT, `export_${t}.png`)]);
 
   // プレビューと書き出しの一致: 同じ時刻の書き出しフレームと、アプリのレンダラーで描いたフレームを比較
@@ -408,6 +423,85 @@ async function main() {
   await page.evaluate(() => window.__MVE__.store.useStore.getState().setPanel('effects'));
   await page.waitForTimeout(800);
   await page.screenshot({ path: join(OUT, 'landscape.png') });
+
+  if (LONG15) {
+    // ---- 15 分・1080p30 の横型動画 ----
+    await page.setViewportSize({ width: 390, height: 844 });
+    await page.evaluate(() => (location.hash = ''));
+    await page.waitForTimeout(800);
+    await page.getByRole('button', { name: '新規プロジェクト' }).click();
+    await page.getByRole('button', { name: /16:9/ }).click();
+    await page.getByRole('button', { name: '30 fps' }).click();
+    await page.getByRole('button', { name: '作成' }).click();
+    await waitFor(page, () => !!window.__MVE__.store.useStore.getState().project);
+    await page.getByRole('button', { name: '追加' }).click();
+    await page.locator('input[type=file][multiple]').setInputFiles([f('long15.mp4'), f('bgm15.mp3')]);
+    await waitFor(page, () => window.__MVE__.store.useStore.getState().project.assets.length >= 2, null, 300000);
+    // 区間デコード: WebCodecs 方式と ADTS 方式 (古い iPhone 向け) が同じ音を同じ時刻で返すか
+    const cmpAudio = await page.evaluate(async () => {
+      const { store, decodeSegmentWith } = window.__MVE__;
+      const a = store.useStore.getState().project.assets.find((x) => x.name === 'long15.mp4');
+      const k = 120; // 600〜605 秒 (600 秒にビープ)
+      const w = await decodeSegmentWith(a, k, 'webcodecs');
+      const d = await decodeSegmentWith(a, k, 'adts');
+      const x = w.getChannelData(0);
+      const y = d.getChannelData(0);
+      let best = { lag: 0, corr: -1 };
+      for (let lag = -2400; lag <= 2400; lag += 8) {
+        let sxy = 0, sxx = 0, syy = 0;
+        for (let i = 4800; i < x.length - 4800; i += 3) {
+          const a1 = x[i];
+          const b1 = y[i + lag] ?? 0;
+          sxy += a1 * b1; sxx += a1 * a1; syy += b1 * b1;
+        }
+        const c = sxy / Math.sqrt(sxx * syy + 1e-12);
+        if (c > best.corr) best = { lag, corr: c };
+      }
+      return { lagMs: (best.lag / 48), corr: best.corr, len: [w.length, d.length] };
+    });
+    check('区間デコード: ADTS 方式と WebCodecs 方式の一致', cmpAudio.corr > 0.95 && Math.abs(cmpAudio.lagMs) <= 2, JSON.stringify(cmpAudio));
+    await page.evaluate(() => {
+      const { store, defaults } = window.__MVE__;
+      store.useStore.getState().update((p) => {
+        const tt = p.tracks.find((t) => t.name === 'テキスト');
+        for (let i = 0; i < 30; i++) {
+          const c = defaults.createClip(p, 'text', tt.id, i * 30 + 1, 6);
+          c.text.content = `パート ${i + 1}`;
+          c.text.anims = [{ kind: 'popIn', duration: 0.4, stagger: 0.04, order: 'forward', amount: 1, mode: 'in', ease: { kind: 'easeOut' } }];
+          p.clips.push(c);
+        }
+        const bgm = p.clips.find((c) => c.type === 'audio');
+        bgm.audio.volume = 0.5;
+      });
+      // createWritable が無い Safari を想定し、Worker の SyncAccessHandle 経路で書き出す
+      window.__MVE__.targetDebug.disable = ['opfs'];
+    });
+    const rss = [];
+    const sampler = setInterval(() => {
+      try {
+        const out = execFileSync('sh', ['-c', "ps -o rss=,args= -C chrome-headless-shell.real | grep -- '--type=renderer' | awk '{print $1}' | sort -n | tail -1"]).toString().trim();
+        if (out) rss.push(Number(out) / 1024);
+      } catch {}
+    }, 10000);
+    const heapBefore = await page.evaluate(() => performance.memory?.usedJSHeapSize ?? 0);
+    const ex3 = await exportAndSave(page, 'e2e_15min_1080p30.mp4', { res: '1080p', fps: 30, timeout: 180 * 60 * 1000 });
+    clearInterval(sampler);
+    const heapAfter = await page.evaluate(() => performance.memory?.usedJSHeapSize ?? 0);
+    const kind3 = await page.evaluate(() => window.__MVE_LAST_EXPORT__?.targetKind);
+    const pr3 = probe(ex3.path);
+    const v3 = pr3.streams.find((s) => s.codec_type === 'video');
+    const ok3 = Math.abs(Number(pr3.format.duration) - 900) < 0.2 && Number(v3.nb_frames) === 27000 && v3.width === 1920 && v3.height === 1080;
+    check('15 分 1080p30 の書き出し', ok3, `${Number(pr3.format.duration).toFixed(2)}s, ${v3.nb_frames} フレーム, ${(Number(pr3.format.size) / 1048576).toFixed(0)}MB, ${(ex3.seconds / 60).toFixed(1)} 分, 保存先 ${kind3}`);
+    check('15 分: Worker 経由の逐次書き込み', kind3 === 'opfs-worker', String(kind3));
+    const maxRss = Math.max(...rss);
+    const firstRss = rss[0] ?? 0;
+    check('15 分: メモリが増え続けない', maxRss - firstRss < 400, `レンダラー ${firstRss.toFixed(0)}→最大 ${maxRss.toFixed(0)}MB, JS ヒープ ${(heapBefore / 1e6).toFixed(0)}→${(heapAfter / 1e6).toFixed(0)}MB`);
+    const beep = (t) => Number(execFileSync('sh', ['-c', `ffmpeg -v info -ss ${t} -t 0.1 -i "${ex3.path}" -af highpass=f=800,volumedetect -vn -f null - 2>&1 | grep max_volume || true`]).toString().match(/max_volume: (-?[\d.]+)/)?.[1] ?? -99);
+    const b1 = beep(600.0), q1 = beep(599.7), b2 = beep(840.0), q2 = beep(839.7);
+    check('15 分: 終盤まで音ズレなし (600秒/840秒のビープ)', b1 > q1 + 12 && b2 > q2 + 12, `600s ${b1}dB (直前 ${q1}dB), 840s ${b2}dB (直前 ${q2}dB)`);
+    const derr3 = decodeErrors(ex3.path);
+    check('15 分: MP4 が正常にデコードできる', derr3 === '', derr3.slice(0, 200));
+  }
 
   if (LONG) {
     // ---- 9. 8 分以上の横型動画 ----

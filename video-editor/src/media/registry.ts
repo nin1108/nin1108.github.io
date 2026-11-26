@@ -202,22 +202,10 @@ export async function peaksFor(asset: AssetMeta): Promise<Float32Array | null> {
     peaksCache.set(asset.id, stored);
     return stored;
   }
-  const buf = await audioBufferFor(asset);
-  if (!buf) return null;
-  const n = Math.max(1, Math.ceil(buf.duration * PEAKS_PER_SEC));
-  const out = new Float32Array(n);
-  const step = buf.sampleRate / PEAKS_PER_SEC;
-  const chans = Array.from({ length: buf.numberOfChannels }, (_, i) => buf.getChannelData(i));
-  for (let i = 0; i < n; i++) {
-    let m = 0;
-    const s = Math.floor(i * step);
-    const e = Math.min(buf.length, Math.floor((i + 1) * step));
-    for (const ch of chans) for (let j = s; j < e; j += 4) {
-      const v = Math.abs(ch[j]);
-      if (v > m) m = v;
-    }
-    out[i] = m;
-  }
+  // 区間ごとにデコードして計算 (長尺素材でも PCM 全体をメモリに置かない)
+  const { computePeaks } = await import('./audioStream');
+  const out = await computePeaks(asset, PEAKS_PER_SEC);
+  if (!out) return null;
   peaksCache.set(asset.id, out);
   void putMeta('peaks:' + asset.id, out).catch(() => {});
   return out;
