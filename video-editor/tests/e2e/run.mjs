@@ -22,6 +22,9 @@ mkdirSync(MEDIA, { recursive: true });
 mkdirSync(OUT, { recursive: true });
 const URL_BASE = process.env.APP_URL ?? 'http://localhost:4173/';
 const LONG = process.argv.includes('--long');
+// --quick: 書き出しを 720p30 にして短時間で確認する
+const QUICK = process.argv.includes('--quick');
+const EXP = QUICK ? { res: '720p', fps: 30, w: 720, h: 1280 } : { res: '1080p', fps: 60, w: 1080, h: 1920 };
 
 const results = [];
 function check(name, ok, detail = '') {
@@ -130,6 +133,7 @@ async function main() {
   page.on('pageerror', (e) => errors.push(String(e)));
   page.on('console', (m) => {
     if (m.type() === 'error') errors.push(m.text());
+    if (m.text().startsWith('export: incomplete')) console.log('   [diag]', m.text());
   });
   await page.goto(URL_BASE);
   await waitFor(page, () => !!window.__MVE__);
@@ -301,15 +305,16 @@ async function main() {
 
   // ---- 6〜7. 1080p 60fps で書き出し ----
   await page.evaluate(() => window.__MVE__.store.useStore.getState().select([]));
-  const ex = await exportAndSave(page, 'e2e_vertical_1080p60.mp4', { res: '1080p', fps: 60 });
+  const ex = await exportAndSave(page, `e2e_vertical_${EXP.res}${EXP.fps}.mp4`, { res: EXP.res, fps: EXP.fps });
   const pr = probe(ex.path);
   const v = pr.streams.find((s) => s.codec_type === 'video');
   const a = pr.streams.find((s) => s.codec_type === 'audio');
-  check('MP4 書き出し (H.264 1080x1920 60fps)', v?.codec_name === 'h264' && v.width === 1080 && v.height === 1920 && /^60(\/1)?$/.test(v.r_frame_rate), `${v?.codec_name} ${v?.width}x${v?.height} ${v?.r_frame_rate} (${ex.seconds.toFixed(0)}秒)`);
+  check(`MP4 書き出し (H.264 ${EXP.w}x${EXP.h} ${EXP.fps}fps)`, v?.codec_name === 'h264' && v.width === EXP.w && v.height === EXP.h && new RegExp(`^${EXP.fps}(/1)?$`).test(v.r_frame_rate), `${v?.codec_name} ${v?.width}x${v?.height} ${v?.r_frame_rate} (${ex.seconds.toFixed(0)}秒)`);
   check('AAC 音声トラック', a?.codec_name === 'aac' && Number(a.sample_rate) === 48000, `${a?.codec_name} ${a?.sample_rate}Hz ${a?.channels}ch`);
   check('動画の長さ', Math.abs(Number(pr.format.duration) - 30) < 0.1, `${pr.format.duration}s`);
   const nb = Number(v?.nb_frames);
-  check('フレーム数 (60fps × 30秒 = 1800)', Math.abs(nb - 1800) <= 1, String(nb));
+  check(`フレーム数 (${EXP.fps}fps × 30秒 = ${EXP.fps * 30})`, Math.abs(nb - EXP.fps * 30) <= 1, String(nb));
+  check('書き出しで全レイヤーを描画 (素材の読み込み漏れなし)', !ex.warnings.some((w) => w.includes('読み込めず')), ex.warnings.join(' / '));
   const derr = decodeErrors(ex.path);
   check('MP4 が正常にデコードできる (ffmpeg)', derr === '', derr.slice(0, 200));
   // 音声同期: 効果音 (1200Hz) が 5.0s と 15.0s に存在し、直前は静か

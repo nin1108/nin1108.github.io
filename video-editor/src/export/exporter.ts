@@ -146,6 +146,8 @@ export async function exportVideo(p: Project, s: ExportSettings, onProgress: (pr
   try {
     await output.start();
     const CHUNK = 10; // 秒
+    let missingFrames = 0;
+    const missingNames = new Set<string>();
     let audioDone = 0;
     const tStart = performance.now();
     for (let i = 0; i < totalFrames; i++) {
@@ -168,7 +170,11 @@ export async function exportVideo(p: Project, s: ExportSettings, onProgress: (pr
         await frames.prefetch(needs);
         res = comp.render(p, t, frames, { scale, imageMaxDim: Math.max(s.width, s.height) * 2, frame: i, final: true });
       }
-      if (res.incomplete && !warnings.includes('一部のフレームで素材を読み込めませんでした')) warnings.push('一部のフレームで素材を読み込めませんでした');
+      if (res.incomplete) {
+        missingFrames++;
+        for (const m of res.missing) missingNames.add(m);
+        console.warn('export: incomplete frame', i, t.toFixed(3), res.missing);
+      }
       await videoSource.add(i / s.fps, 1 / s.fps);
       if (i % 3 === 0 || i === totalFrames - 1) {
         const el = (performance.now() - tStart) / 1000;
@@ -186,6 +192,7 @@ export async function exportVideo(p: Project, s: ExportSettings, onProgress: (pr
     audioSource?.close();
     await output.finalize();
     const blob = await getBlob();
+    if (missingFrames) warnings.push(`${missingFrames} フレームで素材を読み込めず、一部のレイヤーが描画されませんでした (${[...missingNames].slice(0, 4).join('、')})`);
     if (frames.usedFallback) warnings.push('一部の動画はフレーム単位シーク方式でデコードしました (時間がかかります)');
     report('done', 1, totalFrames, '完了');
     return { blob: blob.type ? blob : new Blob([blob], { type: 'video/mp4' }), fileName: s.fileName, mime: 'video/mp4', warnings, seconds: (performance.now() - t0) / 1000 };

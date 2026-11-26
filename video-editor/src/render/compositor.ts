@@ -528,6 +528,7 @@ export class Compositor {
     if (img === 'skip') return null;
     if (!img) {
       state.incomplete = true;
+      (state as any).missing?.push(`${clip.type}:${clip.name}`);
       return null;
     }
     const gl = this.gl;
@@ -928,9 +929,9 @@ export class Compositor {
   }
 
   /** 1 フレーム描画。incomplete=true は素材が未準備で描けなかったレイヤーがあることを示す */
-  render(p: Project, t: number, src: FrameSource, opts: RenderOpts): { incomplete: boolean } {
-    const state = { incomplete: false };
-    if (this.lost || this.gl.isContextLost()) return { incomplete: true };
+  render(p: Project, t: number, src: FrameSource, opts: RenderOpts): { incomplete: boolean; missing: string[] } {
+    const state = { incomplete: false, missing: [] as string[] };
+    if (this.lost || this.gl.isContextLost()) return { incomplete: true, missing: ['WebGL コンテキスト'] };
     const gl = this.gl;
     for (const f of this.pool) f.busy = false;
     let acc = this.acquire();
