@@ -110,16 +110,10 @@ export class Compositor {
     const gl = this.gl;
     this.maxTextureSize = gl.getParameter(gl.MAX_TEXTURE_SIZE);
     this.progs = {
-      layer: compile(gl, VS_LAYER, FS_LAYER, 'layer'),
       copy: compile(gl, VS_FULL, FS_COPY, 'copy'),
       present: compile(gl, VS_FULL, FS_PRESENT, 'present'),
-      blur: compile(gl, VS_FULL, FS_BLUR, 'blur'),
       bright: compile(gl, VS_FULL, FS_BRIGHT, 'bright'),
-      combine: compile(gl, VS_FULL, FS_COMBINE, 'combine'),
       rays: compile(gl, VS_FULL, FS_RAYS, 'rays'),
-      fx: compile(gl, VS_FULL, FS_FX, 'fx'),
-      blend: compile(gl, VS_FULL, FS_BLEND, 'blend'),
-      transition: compile(gl, VS_FULL, FS_TRANSITION, 'transition'),
     };
     this.vao = gl.createVertexArray()!;
     gl.bindVertexArray(this.vao);
@@ -133,6 +127,7 @@ export class Compositor {
     this.emptyTex = createTexture(gl);
     gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, 1, 1, 0, gl.RGBA, gl.UNSIGNED_BYTE, new Uint8Array([0, 0, 0, 0]));
     this.pool = [];
+    this.variants = new Map();
     this.gen.clear();
     this.videoTex.clear();
     this.curveTex.clear();
@@ -181,6 +176,25 @@ export class Compositor {
     this.gl.useProgram(p.prog);
     return p;
   }
+  /**
+   * 分岐用の int uniform を定数に置き換えた特殊化シェーダーを遅延コンパイルして使う。
+   * 不要な分岐がコンパイル時に除去され、モバイル GPU のレジスタ圧迫やソフトウェア GL の全分岐実行を避けられる。
+   */
+  private variants = new Map<string, Program>();
+  private useV(base: 'layer' | 'fx' | 'transition' | 'blend' | 'combine' | 'blur', defs: Record<string, number>): Program {
+    const key = base + JSON.stringify(defs);
+    let p = this.variants.get(key);
+    if (!p) {
+      const src = { layer: FS_LAYER, fx: FS_FX, transition: FS_TRANSITION, blend: FS_BLEND, combine: FS_COMBINE, blur: FS_BLUR }[base];
+      let fs = src;
+      for (const [k, v] of Object.entries(defs)) fs = fs.replace(new RegExp(`uniform int ${k};`), `const int ${k} = ${Math.round(v)};`);
+      p = compile(this.gl, base === 'layer' ? VS_LAYER : VS_FULL, fs, key);
+      this.variants.set(key, p);
+    }
+    this.gl.useProgram(p.prog);
+    return p;
+  }
+  private curLayer!: Program;
   private tex(unit: number, t: WebGLTexture, loc: WebGLUniformLocation | null | undefined) {
     const gl = this.gl;
     gl.activeTexture(gl.TEXTURE0 + unit);
@@ -424,7 +438,10 @@ export class Compositor {
   // ---------- レイヤー描画 ----------
   private setLayerUniforms(rc: Clip, info: LayerInfo, t: number, adjustment = false) {
     const gl = this.gl;
-    const u = this.progs.layer.u;
+    const ck0 = rc.effects.some((e) => e.enabled && e.type === 'chromaKey');
+    const pr = this.useV('layer', { u_ck: ck0 ? 1 : 0, u_mask: rc.mask.enabled ? 1 : 0, u_grade: rc.grade.enabled ? 1 : 0 });
+    this.curLayer = pr;
+    const u = pr.u;
     gl.uniform2f(u.u_srcSize, info.w, info.h);
     gl.uniform1f(u.u_time, t);
     const ck = rc.effects.find((e) => e.enabled && e.type === 'chromaKey');
@@ -486,7 +503,7 @@ export class Compositor {
 
   private drawInstance(p: Project, clip: Clip, rc: Clip, info: LayerInfo, t: number, alphaMul: number) {
     const gl = this.gl;
-    const u = this.progs.layer.u;
+    const u = this.curLayer.u;
     const c = rc.crop;
     const x0 = -info.cx + c.left * info.w;
     const x1 = -info.cx + (1 - c.right) * info.w;
@@ -518,9 +535,8 @@ export class Compositor {
     const target = direct ? direct.acc : this.acquire();
     if (direct) this.bindTarget(target);
     else this.clear(target);
-    this.use('layer');
     this.setLayerUniforms(rc, img.info, t);
-    this.tex(0, img.tex, this.progs.layer.u.u_tex);
+    this.tex(0, img.tex, this.curLayer.u.u_tex);
     gl.enable(gl.BLEND);
     gl.blendFunc(gl.ONE, gl.ONE_MINUS_SRC_ALPHA);
     // 残像 (エコー)
@@ -563,7 +579,7 @@ export class Compositor {
     const gl = this.gl;
     const a = this.acquire();
     const b = this.acquire();
-    const pr = this.use('blur');
+    const pr = this.useV('blur', { u_tilt: tilt ? 1 : 0 });
     gl.uniform2f(pr.u.u_res, this.outW, this.outH);
     gl.uniform1f(pr.u.u_sigma, sigma);
     gl.uniform1i(pr.u.u_tilt, tilt ? 1 : 0);
@@ -601,8 +617,7 @@ export class Compositor {
     const gl = this.gl;
     const out = this.acquire();
     this.bindTarget(out);
-    const pr = this.use('fx');
-    gl.uniform1i(pr.u.u_type, type);
+    const pr = this.useV('fx', { u_type: type });
     gl.uniform2f(pr.u.u_res, this.outW, this.outH);
     gl.uniform1f(pr.u.u_time, t);
     gl.uniform4f(pr.u.u_p, 0, 0, 0, 0);
@@ -646,8 +661,7 @@ export class Compositor {
           this.release(bright);
           const out = this.acquire();
           this.bindTarget(out);
-          const pc = this.use('combine');
-          gl.uniform1i(pc.u.u_mode, 0);
+          const pc = this.useV('combine', { u_mode: 0 });
           gl.uniform3fv(pc.u.u_color, rgb(String(P.color ?? '#ffffff')));
           gl.uniform1f(pc.u.u_intensity, num(P.intensity, 1.5));
           gl.uniform1f(pc.u.u_tint, num(P.tint, 0));
@@ -665,8 +679,7 @@ export class Compositor {
           const b2 = this.blurPass(cur, r * 0.3);
           const out = this.acquire();
           this.bindTarget(out);
-          const pc = this.use('combine');
-          gl.uniform1i(pc.u.u_mode, 1);
+          const pc = this.useV('combine', { u_mode: 1 });
           gl.uniform3fv(pc.u.u_color, rgb(String(P.color ?? '#00e5ff')));
           gl.uniform1f(pc.u.u_intensity, num(P.intensity, 2));
           gl.uniform1f(pc.u.u_core, num(P.core, 0.6));
@@ -685,10 +698,9 @@ export class Compositor {
           const bl = this.blurPass(cur, Math.max(0.5, num(P.softness, 20) * s));
           const out = this.acquire();
           this.bindTarget(out);
-          const pc = this.use('combine');
+          const pc = this.useV('combine', { u_mode: 2 });
           const a = (num(P.angle, 45) * Math.PI) / 180;
           const d = num(P.distance, 20) * s;
-          gl.uniform1i(pc.u.u_mode, 2);
           gl.uniform3fv(pc.u.u_color, rgb(String(P.color ?? '#000000')));
           gl.uniform1f(pc.u.u_opacity, num(P.opacity, 0.7));
           gl.uniform2f(pc.u.u_offset, (Math.cos(a) * d) / this.outW, (-Math.sin(a) * d) / this.outH);
@@ -820,8 +832,7 @@ export class Compositor {
     const gl = this.gl;
     const out = this.acquire();
     this.bindTarget(out);
-    const pr = this.use('blend');
-    gl.uniform1i(pr.u.u_mode, BLEND_IDX[mode] ?? 0);
+    const pr = this.useV('blend', { u_mode: BLEND_IDX[mode] ?? 0 });
     gl.uniform1f(pr.u.u_opacity, Math.max(0, Math.min(1, opacity)));
     this.tex(0, acc.tex, pr.u.u_base);
     this.tex(1, layer.tex, pr.u.u_layer);
@@ -834,8 +845,7 @@ export class Compositor {
     const gl = this.gl;
     const out = this.acquire();
     this.bindTarget(out);
-    const pr = this.use('transition');
-    gl.uniform1i(pr.u.u_type, TRANS_IDX[type] ?? 0);
+    const pr = this.useV('transition', { u_type: TRANS_IDX[type] ?? 0 });
     gl.uniform1f(pr.u.u_p, prog);
     gl.uniform2f(pr.u.u_res, this.outW, this.outH);
     gl.uniform1f(pr.u.u_time, t);
@@ -851,9 +861,8 @@ export class Compositor {
     const rc = resolveClipAt(clip, Math.max(0, Math.min(l, clip.duration)));
     let work = this.acquire();
     this.bindTarget(work);
-    this.use('layer');
-    const u = this.progs.layer.u;
     this.setLayerUniforms(rc, { w: this.outW, h: this.outH, cx: 0, cy: 0 }, t, true);
+    const u = this.curLayer.u;
     // 画面全体を覆う四角形 (恒等変換)
     gl.uniform4f(u.u_rect, -1, -1, 1, 1);
     gl.uniform4f(u.u_uvRect, 0, 0, 1, 1);
