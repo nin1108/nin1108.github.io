@@ -8,7 +8,6 @@ import { projectDuration } from '../model/ops';
 import { fontString } from '../render/text';
 import { ensureWebFont } from '../render/fonts';
 import { PreviewVideoPool } from '../media/video';
-import { sourceTime } from '../model/ops';
 
 export interface ExportSettings {
   width: number;
@@ -244,13 +243,7 @@ async function exportRealtime(p: Project, s: ExportSettings, onProgress: (pr: Ex
         if (signal.aborted) return reject(new DOMException('キャンセルしました', 'AbortError'));
         const t = from + Math.max(0, actx.currentTime - startCtx);
         if (t >= to) return resolve();
-        const active = p.clips
-          .filter((c) => c.type === 'video' && t >= c.start && t < c.start + c.duration)
-          .map((clip) => {
-            const asset = p.assets.find((a) => a.id === clip.assetId)!;
-            return { clip, asset, srcTime: sourceTime(clip, t, asset?.duration) };
-          })
-          .filter((x) => x.asset);
+        const active = Compositor.videoNeeds(p, t);
         pool.sync(active, true, s.fps);
         comp.render(p, t, pool, { scale: s.width / p.width, imageMaxDim: Math.max(s.width, s.height) * 2, frame: Math.round(t * s.fps), final: true });
         rerender = false;

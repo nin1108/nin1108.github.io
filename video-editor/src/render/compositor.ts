@@ -919,10 +919,13 @@ export class Compositor {
     const out: { clip: Clip; asset: AssetMeta; srcTime: number }[] = [];
     for (const track of p.tracks) {
       if (track.kind !== 'visual' || track.hidden) continue;
-      for (const { clip } of layersOnTrack(p, track.id, t)) {
-        if (clip.type !== 'video') continue;
-        const asset = p.assets.find((a) => a.id === clip.assetId);
-        if (asset) out.push({ clip, asset, srcTime: sourceTime(clip, t, asset.duration) });
+      for (const item of layersOnTrack(p, track.id, t)) {
+        // トランジション中は出ていく側のクリップのフレームも必要
+        for (const clip of [item.clip, item.transition?.from]) {
+          if (!clip || clip.type !== 'video') continue;
+          const asset = p.assets.find((a) => a.id === clip.assetId);
+          if (asset) out.push({ clip, asset, srcTime: sourceTime(clip, t, asset.duration) });
+        }
       }
     }
     return out;
