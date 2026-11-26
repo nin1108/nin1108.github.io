@@ -2,7 +2,7 @@
 // 使い方: npm run build && npx vite preview --port 4173 & node tests/e2e/run.mjs [--long]
 import { createRequire } from 'node:module';
 import { execFileSync } from 'node:child_process';
-import { existsSync, mkdirSync, writeFileSync } from 'node:fs';
+import { appendFileSync, existsSync, mkdirSync, writeFileSync } from 'node:fs';
 import { join, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
@@ -80,21 +80,32 @@ async function exportAndSave(page, name, opts) {
       last = state.info;
       process.stdout.write(`   … ${state.info.slice(0, 90)}\r`);
     }
-    if (state.done) break;
+    if (state.done) {
+      await opts.onDone?.();
+      break;
+    }
     if (/失敗|キャンセル/.test(state.err)) throw new Error(state.err);
     if (Date.now() - t0 > (opts.timeout ?? 40 * 60 * 1000)) throw new Error('export timeout');
   }
   console.log('');
-  const b64 = await page.evaluate(async () => {
+  // 書き出した動画を 16MB ずつ取り出す (大きな文字列を作らない)
+  const size = await page.evaluate(async () => {
     const v = document.querySelector('.result-video');
-    const blob = await (await fetch(v.src)).blob();
-    const buf = new Uint8Array(await blob.arrayBuffer());
-    let s = '';
-    for (let i = 0; i < buf.length; i += 0x8000) s += String.fromCharCode(...buf.subarray(i, i + 0x8000));
-    return btoa(s);
+    window.__E2E_BLOB__ = await (await fetch(v.src)).blob();
+    return window.__E2E_BLOB__.size;
   });
   const path = join(OUT, name);
-  writeFileSync(path, Buffer.from(b64, 'base64'));
+  writeFileSync(path, Buffer.alloc(0));
+  for (let off = 0; off < size; off += 16 * 1024 * 1024) {
+    const b64 = await page.evaluate(async (off) => {
+      const buf = new Uint8Array(await window.__E2E_BLOB__.slice(off, off + 16 * 1024 * 1024).arrayBuffer());
+      let s = '';
+      for (let i = 0; i < buf.length; i += 0x8000) s += String.fromCharCode(...buf.subarray(i, i + 0x8000));
+      return btoa(s);
+    }, off);
+    appendFileSync(path, Buffer.from(b64, 'base64'));
+  }
+  await page.evaluate(() => (window.__E2E_BLOB__ = null));
   const warnings = await page.evaluate(() => [...document.querySelectorAll('.export-result .warn')].map((e) => e.textContent));
   return { path, seconds: (Date.now() - t0) / 1000, warnings };
 }
@@ -484,9 +495,17 @@ async function main() {
       } catch {}
     }, 10000);
     const heapBefore = await page.evaluate(() => performance.memory?.usedJSHeapSize ?? 0);
-    const ex3 = await exportAndSave(page, 'e2e_15min_1080p30.mp4', { res: '1080p', fps: 30, timeout: 180 * 60 * 1000 });
-    clearInterval(sampler);
-    const heapAfter = await page.evaluate(() => performance.memory?.usedJSHeapSize ?? 0);
+    let heapAfter = 0;
+    // メモリは書き出し中だけを計測 (テストが結果ファイルを取り出す処理は含めない)
+    const ex3 = await exportAndSave(page, 'e2e_15min_1080p30.mp4', {
+      res: '1080p',
+      fps: 30,
+      timeout: 180 * 60 * 1000,
+      onDone: async () => {
+        clearInterval(sampler);
+        heapAfter = await page.evaluate(() => performance.memory?.usedJSHeapSize ?? 0);
+      },
+    });
     const kind3 = await page.evaluate(() => window.__MVE_LAST_EXPORT__?.targetKind);
     const pr3 = probe(ex3.path);
     const v3 = pr3.streams.find((s) => s.codec_type === 'video');
@@ -496,9 +515,10 @@ async function main() {
     const maxRss = Math.max(...rss);
     const firstRss = rss[0] ?? 0;
     check('15 分: メモリが増え続けない', maxRss - firstRss < 400, `レンダラー ${firstRss.toFixed(0)}→最大 ${maxRss.toFixed(0)}MB, JS ヒープ ${(heapBefore / 1e6).toFixed(0)}→${(heapAfter / 1e6).toFixed(0)}MB`);
-    const beep = (t) => Number(execFileSync('sh', ['-c', `ffmpeg -v info -ss ${t} -t 0.1 -i "${ex3.path}" -af highpass=f=800,volumedetect -vn -f null - 2>&1 | grep max_volume || true`]).toString().match(/max_volume: (-?[\d.]+)/)?.[1] ?? -99);
-    const b1 = beep(600.0), q1 = beep(599.7), b2 = beep(840.0), q2 = beep(839.7);
-    check('15 分: 終盤まで音ズレなし (600秒/840秒のビープ)', b1 > q1 + 12 && b2 > q2 + 12, `600s ${b1}dB (直前 ${q1}dB), 840s ${b2}dB (直前 ${q2}dB)`);
+    // 1kHz のビープだけを取り出し、鳴るべき 0.1 秒間とその前後 0.2 秒を比べる
+    const beep = (t) => Number(execFileSync('sh', ['-c', `ffmpeg -v info -ss ${t} -t 0.1 -i "${ex3.path}" -af "bandpass=f=1000:width_type=h:w=150,volumedetect" -vn -f null - 2>&1 | grep max_volume || true`]).toString().match(/max_volume: (-?[\d.]+)/)?.[1] ?? -99);
+    const res15 = [600, 840].map((t) => ({ t, on: beep(t), before: beep(t - 0.2), after: beep(t + 0.2) }));
+    check('15 分: 終盤まで音ズレなし (600秒/840秒のビープ)', res15.every((r) => r.on > r.before + 20 && r.on > r.after + 20), res15.map((r) => `${r.t}s ${r.on}dB (前 ${r.before} / 後 ${r.after})`).join(', '));
     const derr3 = decodeErrors(ex3.path);
     check('15 分: MP4 が正常にデコードできる', derr3 === '', derr3.slice(0, 200));
   }
