@@ -1,4 +1,6 @@
+import { useRef, useState } from 'react';
 import { useStore } from '../../store/store';
+import { createProxy, deleteProxy, proxyRecommended } from '../../media/proxy';
 import type { BlendMode, Clip, TransitionType } from '../../model/types';
 import { ParamSlider, Section, Select, Slider, Toggle, Chips } from '../controls';
 import { updateClip, liveClip } from '../params';
@@ -94,6 +96,7 @@ export function EditPanel({ clip }: { clip: Clip }) {
         </div>
       </Section>
       {isMedia || clip.type === 'video' ? <SpeedSection clip={clip} /> : null}
+      {clip.type === 'video' && <ProxySection clip={clip} />}
       <Section title="親子付け・ラベル" defaultOpen={false}>
         <Select
           label="親レイヤー"
@@ -110,6 +113,70 @@ export function EditPanel({ clip }: { clip: Clip }) {
         </div>
       </Section>
     </div>
+  );
+}
+
+function ProxySection({ clip }: { clip: Clip }) {
+  const asset = useStore((s) => s.project?.assets.find((a) => a.id === clip.assetId));
+  const [prog, setProg] = useState<number | null>(null);
+  const abort = useRef<AbortController | null>(null);
+  if (!asset) return null;
+  return (
+    <Section title="プレビュー用プロキシ" defaultOpen={proxyRecommended(asset)}>
+      <p className="hint">
+        {asset.proxyId
+          ? 'プレビューは低解像度のプロキシで再生しています。書き出しは常に元の高画質素材を使います。'
+          : `元素材 ${asset.width}×${asset.height}。重い動画は ${540}p のプロキシを作るとプレビューが軽くなります (書き出しは元素材)。`}
+      </p>
+      {prog != null ? (
+        <>
+          <div className="export-progress">
+            <div className="bar">
+              <div style={{ width: `${(prog * 100).toFixed(1)}%` }} />
+            </div>
+          </div>
+          <button className="wide" onClick={() => abort.current?.abort()}>
+            中止
+          </button>
+        </>
+      ) : asset.proxyId ? (
+        <button
+          className="wide"
+          onClick={async () => {
+            const id = asset.proxyId!;
+            st().update((p) => {
+              const a = p.assets.find((x) => x.id === asset.id);
+              if (a) a.proxyId = undefined;
+            });
+            await deleteProxy(id);
+          }}
+        >
+          プロキシを削除 (元素材でプレビュー)
+        </button>
+      ) : (
+        <button
+          className="wide"
+          onClick={async () => {
+            abort.current = new AbortController();
+            setProg(0);
+            try {
+              const id = await createProxy(asset, setProg, abort.current.signal);
+              st().update((p) => {
+                const a = p.assets.find((x) => x.id === asset.id);
+                if (a) a.proxyId = id;
+              });
+              st().showToast('プロキシを作成しました', 'ok');
+            } catch (e: any) {
+              if (!abort.current?.signal.aborted) st().showToast(String(e?.message ?? e), 'error');
+            } finally {
+              setProg(null);
+            }
+          }}
+        >
+          プロキシを作成
+        </button>
+      )}
+    </Section>
   );
 }
 

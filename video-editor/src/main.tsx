@@ -7,6 +7,8 @@ import { engine } from './ui/engine';
 import * as defaults from './model/defaults';
 import { Compositor } from './render/compositor';
 import { ExportFrameSource } from './media/video';
+import * as proxy from './media/proxy';
+import * as registry from './media/registry';
 
 // iOS のダブルタップ拡大・ピンチによるページ拡大を防止 (アプリ内のピンチ操作を優先)
 document.addEventListener('gesturestart', (e) => e.preventDefault(), { passive: false } as any);
@@ -25,6 +27,6 @@ if ('serviceWorker' in navigator && location.protocol === 'https:') {
 }
 
 // 自動テスト・デバッグ用ハンドル (動作には影響しない)
-(window as any).__MVE__ = { store, actions, engine, defaults, Compositor, ExportFrameSource };
+(window as any).__MVE__ = { store, actions, engine, defaults, Compositor, ExportFrameSource, proxy, registry };
 
 createRoot(document.getElementById('root')!).render(<App />);

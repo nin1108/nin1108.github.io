@@ -362,6 +362,22 @@ async function main() {
   await page.waitForTimeout(1500);
   await page.screenshot({ path: join(OUT, 'after_reload.png') });
 
+  // プロキシ (プレビュー用低解像度動画) の生成
+  const proxy = await page.evaluate(async () => {
+    const { store, proxy, registry } = window.__MVE__;
+    const S = store.useStore.getState();
+    const a = S.project.assets.find((x) => x.name === 'video_v.mp4');
+    const id = await proxy.createProxy(a, () => {});
+    S.update((p) => (p.assets.find((x) => x.id === a.id).proxyId = id));
+    const blob = await registry.blobFor(id);
+    const v = document.createElement('video');
+    v.muted = true;
+    v.src = URL.createObjectURL(blob);
+    await new Promise((r, j) => { v.onloadedmetadata = r; v.onerror = j; });
+    return { w: v.videoWidth, h: v.videoHeight, d: v.duration, size: blob.size, orig: a.size };
+  });
+  check('プレビュー用プロキシの生成 (540p)', proxy.w === 540 && proxy.h === 960 && Math.abs(proxy.d - 12) < 0.1, JSON.stringify(proxy));
+
   // UI スモーク: 主要パネルが開けること
   const panels = ['add', 'presets', 'layers', 'project', 'export'];
   for (const pnl of panels) {

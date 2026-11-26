@@ -15,6 +15,7 @@ export interface FrameSource {
 interface PoolEntry {
   el: HTMLVideoElement;
   assetId: string;
+  srcId: string;
   lastUsed: number;
   seeking: boolean;
   pendingSeek: number | null;
@@ -40,7 +41,7 @@ export class PreviewVideoPool implements FrameSource {
     el.setAttribute('webkit-playsinline', '');
     el.preload = 'auto';
     el.crossOrigin = 'anonymous';
-    const e: PoolEntry = { el, assetId: asset.id, lastUsed: performance.now(), seeking: false, pendingSeek: null, ready: false };
+    const e: PoolEntry = { el, assetId: asset.id, srcId: asset.proxyId ?? asset.id, lastUsed: performance.now(), seeking: false, pendingSeek: null, ready: false };
     el.addEventListener('loadeddata', () => {
       e.ready = true;
       this.onFrame();
@@ -121,7 +122,7 @@ export class PreviewVideoPool implements FrameSource {
     for (const { clip, asset, srcTime } of active) {
       keep.add(clip.id);
       let e = this.pool.get(clip.id);
-      if (!e || e.assetId !== asset.id) {
+      if (!e || e.assetId !== asset.id || e.srcId !== (asset.proxyId ?? asset.id)) {
         if (e) this.release(clip.id, e);
         e = this.create(clip, asset);
       }
