@@ -9,6 +9,7 @@ import * as defaults from './model/defaults';
 import { Compositor } from './render/compositor';
 import { ExportFrameSource } from './media/video';
 import * as proxy from './media/proxy';
+import * as presets from './presets/presets';
 import * as registry from './media/registry';
 import { audioDebug, audioOf, decodeSegmentWith } from './media/audioStream';
 import { targetDebug } from './export/target';
@@ -33,6 +34,6 @@ if (!inArtifact && 'serviceWorker' in navigator && location.protocol === 'https:
 }
 
 // 自動テスト・デバッグ用ハンドル (動作には影響しない)
-(window as any).__MVE__ = { store, actions, engine, defaults, Compositor, ExportFrameSource, proxy, registry, audioDebug, audioOf, decodeSegmentWith, targetDebug };
+(window as any).__MVE__ = { store, actions, engine, defaults, Compositor, ExportFrameSource, proxy, registry, audioDebug, audioOf, decodeSegmentWith, targetDebug, presets };
 
 createRoot(document.getElementById('root')!).render(<App />);
