@@ -116,6 +116,33 @@ await S(() => {
 await p.getByRole('button', { name: /05 紺の白縁/ }).click();
 c = await clipState();
 check('標準のデザインに戻す', c?.stroke0 === '#ffffff', JSON.stringify(c));
+// 7. プリセットを使わずに作ったテロップ (以前に作ったものと同じ状態) からも上書きできる
+await S(() => {
+  const s = window.__MVE__.store.useStore.getState();
+  s.select([]);
+  window.__MVE__.actions.addText('普通のテキスト');
+  s.update((pr) => {
+    const c = pr.clips.find((x) => x.id === window.__MVE__.store.useStore.getState().selection[0]);
+    delete c.text.presetId;
+    c.text.style.fill = { type: 'solid', color: '#ff00ff', color2: '#ff00ff', angle: 90 };
+  });
+  window.__MVE__.store.useStore.getState().setPanel('text');
+});
+await p.getByRole('button', { name: 'プリセットに上書き保存…' }).click();
+await p.locator('.dialog.picker').getByRole('button', { name: 'YMM4テンプレ', exact: true }).click();
+await p.locator('.dialog.picker').getByRole('button', { name: /07 山吹の茶縁/ }).click();
+await p.getByRole('button', { name: '上書き保存', exact: true }).click();
+await p.waitForTimeout(400);
+c = await clipState();
+check('記録の無いテロップから一覧で選んで上書き', c?.presetId === 'ymm4-07', JSON.stringify(c));
+await S(() => {
+  const s = window.__MVE__.store.useStore.getState();
+  s.select([]);
+  s.setPanel('presets');
+});
+await p.getByRole('button', { name: /07 山吹の茶縁/ }).click();
+c = await clipState();
+check('選んだプリセットに反映', c?.fill === '#ff00ff', JSON.stringify(c));
 check('ページエラーなし', errors.length === 0, errors.join(' | '));
 await b.close();
 console.log(`${results.filter(Boolean).length}/${results.length} 合格`);

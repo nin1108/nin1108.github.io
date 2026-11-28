@@ -1,4 +1,4 @@
-import { useEffect, useRef } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useStore } from '../../store/store';
 import type { CharAnimKind, CharAnimation, Clip, TextStyle } from '../../model/types';
 import { ColorField, ParamColor, ParamSlider, Section, Select, Slider, Toggle, Chips } from '../controls';
@@ -7,7 +7,7 @@ import { BUNDLED_FONTS, SYSTEM_FONTS, WEB_FONTS, ensureWebFont } from '../../ren
 import { importFile, ACCEPT_FONT } from '../../media/import';
 import { EASE_LABELS } from '../../model/keyframes';
 import { Icon } from '../icons';
-import { addUserPreset, clearPresetOverride, deleteUserPreset, loadPresetStore, overwriteUserPreset, setPresetOverride, usePresetStore, USER_PREFIX } from '../../presets/userPresets';
+import { addUserPreset, clearPresetOverride, deleteUserPreset, loadPresetStore, overwriteUserPreset, setPresetOverride, usePresetStore, USER_PREFIX, type UserTextPreset } from '../../presets/userPresets';
 import { PRESETS, userPresetToPreset } from '../../presets/presets';
 import { PresetThumb } from './PresetThumb';
 import { askConfirm, askText } from '../dialog';
@@ -201,14 +201,23 @@ function PresetSaveSection({ clip }: { clip: Clip }) {
   const srcName = userSrc?.name ?? builtin?.name;
   const overridden = !!(srcId && overrides[srcId]);
 
-  const overwrite = async () => {
-    if (!srcId || !srcName) return;
-    const ok = await askConfirm(`「${srcName}」に上書き保存しますか？`, builtin ? '標準のプリセットが今のデザインに置き換わります (あとで「標準のデザインに戻す」で戻せます)。' : 'マイプリセットが今のデザインに置き換わります。', { okLabel: '上書き保存' });
+  const [picking, setPicking] = useState(false);
+  /** 指定したプリセット (標準 / マイプリセット) を今のデザインで上書きする */
+  const overwriteTo = async (targetId: string) => {
+    const tUser = targetId.startsWith(USER_PREFIX) ? mine.find((m) => USER_PREFIX + m.id === targetId) : undefined;
+    const tBuiltin = tUser ? undefined : PRESETS.find((p) => p.id === targetId);
+    const name = tUser?.name ?? tBuiltin?.name;
+    if (!name) return;
+    const ok = await askConfirm(`「${name}」に上書き保存しますか？`, tBuiltin ? '標準のプリセットが今のデザインに置き換わります (あとで「標準のデザインに戻す」で戻せます)。' : 'マイプリセットが今のデザインに置き換わります。', { okLabel: '上書き保存' });
     if (!ok) return;
-    if (userSrc) await overwriteUserPreset(userSrc.id, td.style, td.anims);
-    else await setPresetOverride(srcId, td.style, td.anims);
-    st().showToast(`「${srcName}」に上書き保存しました`, 'ok');
+    if (tUser) await overwriteUserPreset(tUser.id, td.style, td.anims);
+    else await setPresetOverride(targetId, td.style, td.anims);
+    // 以後はこのプリセットが上書き対象
+    updateClip(clip.id, (c) => (c.text!.presetId = targetId));
+    setPicking(false);
+    st().showToast(`「${name}」に上書き保存しました`, 'ok');
   };
+  const overwrite = () => (srcId && srcName ? overwriteTo(srcId) : setPicking(true));
   const saveNew = async () => {
     const name = await askText('新しいプリセットの名前', srcName ? `${srcName.replace(/^\d+\s*/, '')} (改)` : td.content.slice(0, 10) || 'マイテロップ');
     if (!name) return;
@@ -243,14 +252,13 @@ function PresetSaveSection({ clip }: { clip: Clip }) {
           {overridden && <span className="badge">編集済み</span>}
         </p>
       ) : (
-        <p className="hint">プリセットから作ったテロップは、編集後に元のプリセットへ上書き保存できます。</p>
+        <p className="hint">今のデザインを、既存のプリセットに上書き保存したり、新しいプリセットとして保存したりできます。</p>
       )}
       <div className="btn-row">
-        {srcName && (
-          <button className="accent" onClick={overwrite}>
-            「{srcName}」に上書き保存
-          </button>
-        )}
+        <button className="accent" onClick={overwrite}>
+          {srcName ? `「${srcName}」に上書き保存` : 'プリセットに上書き保存…'}
+        </button>
+        {srcName && <button onClick={() => setPicking(true)}>別のプリセットに上書き…</button>}
         <button onClick={saveNew}>新しいプリセットとして保存</button>
         {builtin && overridden && <button onClick={resetBuiltin}>標準のデザインに戻す</button>}
       </div>
@@ -272,7 +280,39 @@ function PresetSaveSection({ clip }: { clip: Clip }) {
           </div>
         </>
       )}
+      {picking && <OverwritePicker mine={mine} overrides={overrides} onPick={overwriteTo} onClose={() => setPicking(false)} />}
     </Section>
+  );
+}
+
+/** 上書きするプリセットを見本付きで選ぶ */
+function OverwritePicker({ mine, overrides, onPick, onClose }: { mine: UserTextPreset[]; overrides: Record<string, { savedAt: number }>; onPick: (id: string) => void; onClose: () => void }) {
+  const [cat, setCat] = useState<'mine' | 'ymm4' | 'other'>(mine.length ? 'mine' : 'ymm4');
+  const items = cat === 'mine' ? mine.map(userPresetToPreset) : PRESETS.filter((p) => p.kind === 'text' && (cat === 'ymm4' ? p.category === 'ymm4' : p.category !== 'ymm4'));
+  return (
+    <div className="dialog-backdrop" onClick={onClose}>
+      <div className="dialog picker" role="dialog" aria-modal="true" aria-label="上書きするプリセットを選ぶ" onClick={(e) => e.stopPropagation()}>
+        <h3>上書きするプリセットを選ぶ</h3>
+        <Chips value={cat} options={[['mine', 'マイプリセット'], ['ymm4', 'YMM4テンプレ'], ['other', 'その他のテロップ']]} onChange={setCat} />
+        {items.length === 0 ? (
+          <p className="hint">まだありません。「新しいプリセットとして保存」で作れます。</p>
+        ) : (
+          <div className="picker-grid">
+            {items.map((p) => (
+              <button key={p.id} className="preset text" onClick={() => onPick(p.id)}>
+                <PresetThumb preset={p} version={overrides[p.id]?.savedAt ?? mine.find((m) => USER_PREFIX + m.id === p.id)?.updatedAt} />
+                <span className="preset-name small">{p.name}</span>
+              </button>
+            ))}
+          </div>
+        )}
+        <div className="btn-row">
+          <button type="button" onClick={onClose}>
+            キャンセル
+          </button>
+        </div>
+      </div>
+    </div>
   );
 }
 

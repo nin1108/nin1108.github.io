@@ -33,6 +33,11 @@ export function PresetsPanel() {
   return (
     <div className="panel-body">
       <p className="hint">全 {all.length} 種類。{clip ? `選択中「${clip.name}」に適用します。テンプレートは再生ヘッド位置に追加されます。` : 'クリップ未選択時: テロップは新規テキスト、カラー/エフェクトは調整レイヤーとして追加します。'}</p>
+      {clip?.type === 'text' && (
+        <button className="wide" onClick={() => useStore.getState().setPanel('text')}>
+          選択中のテロップをプリセットに上書き保存
+        </button>
+      )}
       <div className="scroll-chips">
         <Chips value={kind} options={[['all', 'すべて'], ...(Object.entries(KIND_LABELS) as [PresetKind, string][])]} onChange={setKind} />
       </div>
