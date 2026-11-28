@@ -59,7 +59,7 @@ src/model/       データモデル・キーフレーム補間・タイムライ
 src/render/      WebGL コンポジター・シェーダー・テキスト/図形/パーティクル生成
 src/media/       素材読み込み・動画フレーム供給 (プレビュー/書き出し)・音声ミックス
 src/export/      書き出し・端末性能判定
-src/presets/     プリセット (132 種類)
+src/presets/     プリセット (171 種類。うち「YMM4テンプレ」39 種類)
 src/storage/     IndexedDB
 src/ui/          画面 (タイムライン・プレビュー・各パネル)
 tests/unit/      ユニットテスト

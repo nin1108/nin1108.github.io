@@ -10,6 +10,7 @@ import { loadBackups, storageEstimate } from '../../storage/db';
 import { normalizeProject } from '../../model/defaults';
 import { Icon } from '../icons';
 import { askConfirm } from '../dialog';
+import { PresetThumb } from './PresetThumb';
 import { inArtifact } from '../platform';
 import { engine } from '../engine';
 
@@ -33,10 +34,8 @@ export function PresetsPanel() {
       <div className="preset-grid">
         {list.map((p) => (
           <button key={p.id} className={'preset ' + p.kind} onClick={() => applyPreset(p.id)}>
-            <span className="preset-kind">{KIND_LABELS[p.kind]}</span>
-            <span className="preset-name" style={p.kind === 'text' && p.swatch ? { color: p.swatch } : undefined}>
-              {p.name}
-            </span>
+            {p.kind === 'text' ? <PresetThumb preset={p} /> : <span className="preset-kind">{KIND_LABELS[p.kind]}</span>}
+            <span className={'preset-name' + (p.kind === 'text' ? ' small' : '')}>{p.name}</span>
             <span className="preset-cat">{CATEGORY_LABELS[p.category]}</span>
           </button>
         ))}

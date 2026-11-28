@@ -245,8 +245,11 @@ function makeFill(ctx: CanvasRenderingContext2D | OffscreenCanvasRenderingContex
   if (f.type === 'solid') return f.color;
   if (f.type === 'radial') {
     const g = ctx.createRadialGradient(x0 + w / 2, y0 + h / 2, 0, x0 + w / 2, y0 + h / 2, Math.max(w, h) / 2);
-    g.addColorStop(0, f.color);
-    g.addColorStop(1, f.color2);
+    if (f.stops && f.stops.length >= 2) f.stops.forEach((c, i) => g.addColorStop(i / (f.stops!.length - 1), c));
+    else {
+      g.addColorStop(0, f.color);
+      g.addColorStop(1, f.color2);
+    }
     return g;
   }
   if (f.type === 'metal') {
@@ -266,6 +269,10 @@ function makeFill(ctx: CanvasRenderingContext2D | OffscreenCanvasRenderingContex
   const cy = y0 + h / 2;
   const len = (Math.abs(Math.cos(a)) * w + Math.abs(Math.sin(a)) * h) / 2;
   const g = ctx.createLinearGradient(cx - Math.cos(a) * len, cy - Math.sin(a) * len, cx + Math.cos(a) * len, cy + Math.sin(a) * len);
+  if (f.stops && f.stops.length >= 2) {
+    f.stops.forEach((c, i) => g.addColorStop(i / (f.stops!.length - 1), c));
+    return g;
+  }
   g.addColorStop(0, f.color);
   if (f.color3) g.addColorStop(0.5, f.color3);
   g.addColorStop(1, f.color2);

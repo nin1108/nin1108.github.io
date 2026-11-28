@@ -21,6 +21,14 @@ export const WEB_FONTS: { family: string; label: string; weights: string }[] = [
   { family: 'DotGothic16', label: 'ドットゴシック', weights: '400' },
   { family: 'Kosugi Maru', label: '小杉丸ゴシック', weights: '400' },
   { family: 'Stick', label: 'スティック', weights: '400' },
+  { family: 'Yuji Syuku', label: '佑字 肅 (毛筆)', weights: '400' },
+  { family: 'Yuji Boku', label: '佑字 朴 (筆文字)', weights: '400' },
+  { family: 'Yuji Mai', label: '佑字 舞 (行書)', weights: '400' },
+  { family: 'Zen Antique', label: 'Zen アンチック', weights: '400' },
+  { family: 'Shippori Mincho B1', label: 'しっぽり明朝 B1', weights: '400;500;600;700;800' },
+  { family: 'Zen Old Mincho', label: 'Zen オールド明朝', weights: '400;500;600;700;900' },
+  { family: 'Kaisei Tokumin', label: '解星 特ミン', weights: '400;500;700;800' },
+  { family: 'Murecho', label: 'ムレチョ (極太)', weights: '100..900' },
 ];
 
 export const SYSTEM_FONTS: { family: string; label: string }[] = [

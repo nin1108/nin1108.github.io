@@ -204,6 +204,8 @@ export interface Fill {
   color2: string;
   color3?: string;
   angle: number; // deg (linear)
+  /** 3 色以上のグラデーション (指定時は color/color2/color3 より優先し、等間隔に配置) */
+  stops?: string[];
 }
 
 export interface TextStyle {

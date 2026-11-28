@@ -10,6 +10,9 @@ import { Compositor } from './render/compositor';
 import { ExportFrameSource } from './media/video';
 import * as proxy from './media/proxy';
 import * as presets from './presets/presets';
+import { YMM4_TEMPLATES } from './presets/ymm4';
+import { renderText } from './render/text';
+import { ensureWebFont } from './render/fonts';
 import * as registry from './media/registry';
 import { audioDebug, audioOf, decodeSegmentWith } from './media/audioStream';
 import { targetDebug } from './export/target';
@@ -34,6 +37,6 @@ if (!inArtifact && 'serviceWorker' in navigator && location.protocol === 'https:
 }
 
 // 自動テスト・デバッグ用ハンドル (動作には影響しない)
-(window as any).__MVE__ = { store, actions, engine, defaults, Compositor, ExportFrameSource, proxy, registry, audioDebug, audioOf, decodeSegmentWith, targetDebug, presets };
+(window as any).__MVE__ = { store, actions, engine, defaults, Compositor, ExportFrameSource, proxy, registry, audioDebug, audioOf, decodeSegmentWith, targetDebug, presets, renderText, ensureWebFont, YMM4_TEMPLATES };
 
 createRoot(document.getElementById('root')!).render(<App />);

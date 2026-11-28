@@ -2,11 +2,13 @@
 import type { CharAnimation, Clip, Ease, EffectType, Project, TextStyle, TransitionType } from '../model/types';
 import { createClip, createEffect, defaultCurves, defaultParticles, defaultShape, defaultTextStyle, uid } from '../model/defaults';
 import { findFreeTrack } from '../model/ops';
+import { YMM4_TEMPLATES } from './ymm4';
 
-export type PresetCategory = 'tv' | 'science' | 'space' | 'neon' | 'news' | 'cinema' | 'gold' | 'kinetic' | 'shorts' | 'tiktok';
+export type PresetCategory = 'ymm4' | 'tv' | 'science' | 'space' | 'neon' | 'news' | 'cinema' | 'gold' | 'kinetic' | 'shorts' | 'tiktok';
 export type PresetKind = 'text' | 'anim' | 'effect' | 'look' | 'template';
 
 export const CATEGORY_LABELS: Record<PresetCategory, string> = {
+  ymm4: 'YMM4テンプレ',
   tv: 'テレビ番組風',
   science: '科学解説風',
   space: '宇宙ドキュメンタリー風',
@@ -590,7 +592,9 @@ const TEMPLATE_PRESETS: Preset[] = [
   }),
 ];
 
-export const PRESETS: Preset[] = [...TEXT_PRESETS, ...ANIM_PRESETS, ...EFFECT_PRESETS, ...LOOK_PRESETS, ...TEMPLATE_PRESETS];
+const YMM4_PRESETS: Preset[] = YMM4_TEMPLATES.map((t) => textPreset(t.id, t.name, 'ymm4', t.style));
+
+export const PRESETS: Preset[] = [...YMM4_PRESETS, ...TEXT_PRESETS, ...ANIM_PRESETS, ...EFFECT_PRESETS, ...LOOK_PRESETS, ...TEMPLATE_PRESETS];
 
 export const TRANSITION_LABELS: Record<TransitionType, string> = {
   crossfade: 'クロスフェード',
