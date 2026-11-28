@@ -9,7 +9,7 @@ import type { FrameSource } from '../media/video';
 import { cachedImage, imageFor, blobFor } from '../media/registry';
 import { fontString, renderText } from './text';
 import { renderChart, renderCounter, renderParticles, renderShape, renderSolid } from './generators';
-import { ensureWebFont, webFontReady } from './fonts';
+import { BUNDLED_FONTS, ensureWebFont, webFontReady } from './fonts';
 import { buildCurve, parseCube } from './compositor-math';
 
 const BLEND_IDX: Record<BlendMode, number> = { normal: 0, multiply: 1, screen: 2, overlay: 3, add: 4, darken: 5, lighten: 6, softLight: 7, hardLight: 8, difference: 9, exclusion: 10, colorDodge: 11, colorBurn: 12 };
@@ -277,6 +277,8 @@ export class Compositor {
   private fontReady(family: string, weight: number, italic: boolean, text: string): boolean {
     if (!webFontReady(family)) {
       void ensureWebFont(family).then(() => this.onNeedsRedraw());
+      // 同梱フォントは読み込み完了まで代替フォントで描かない (書き出しとの不一致を防ぐ)
+      if (BUNDLED_FONTS.some((f) => f.family === family)) return false;
     }
     const f = fontString({ fontFamily: family, fontWeight: weight, italic }, 48);
     try {

@@ -20,7 +20,7 @@ function swManifest() {
         }
       };
       walk(outDir);
-      const precache = files.filter((f) => f !== 'sw.js' && !f.endsWith('.map'));
+      const precache = files.filter((f) => f !== 'sw.js' && !f.endsWith('.map') && !f.startsWith('fonts/'));
       const version = Date.now().toString(36);
       writeFileSync(join(outDir, 'precache.json'), JSON.stringify({ version, files: precache }));
     },

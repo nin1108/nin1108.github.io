@@ -3,7 +3,7 @@ import { useStore } from '../../store/store';
 import type { CharAnimKind, CharAnimation, Clip, TextStyle } from '../../model/types';
 import { ColorField, ParamColor, ParamSlider, Section, Select, Slider, Toggle, Chips } from '../controls';
 import { liveClip, updateClip } from '../params';
-import { SYSTEM_FONTS, WEB_FONTS, ensureWebFont } from '../../render/fonts';
+import { BUNDLED_FONTS, SYSTEM_FONTS, WEB_FONTS, ensureWebFont } from '../../render/fonts';
 import { importFile, ACCEPT_FONT } from '../../media/import';
 import { getMeta, putMeta } from '../../storage/db';
 import { EASE_LABELS } from '../../model/keyframes';
@@ -49,7 +49,7 @@ export function StyleEditor({ clip, base }: { clip: Clip; base: 'text' | 'counte
   const live = (fn: (st2: TextStyle) => void) => liveClip(clip.id, (c) => fn(base === 'text' ? c.text!.style : c.counter!.style));
   const userFonts = project.assets.filter((a) => a.kind === 'font' && a.fontFamily);
   const fontRef = useRef<HTMLInputElement>(null);
-  const fontOptions: [string, string][] = [...WEB_FONTS.map((f) => [f.family, f.label] as [string, string]), ...SYSTEM_FONTS.map((f) => [f.family, f.label] as [string, string]), ...userFonts.map((f) => [f.fontFamily!, '★ ' + f.name] as [string, string])];
+  const fontOptions: [string, string][] = [...BUNDLED_FONTS.map((f) => [f.family, f.label] as [string, string]), ...WEB_FONTS.map((f) => [f.family, f.label] as [string, string]), ...SYSTEM_FONTS.map((f) => [f.family, f.label] as [string, string]), ...userFonts.map((f) => [f.fontFamily!, '★ ' + f.name] as [string, string])];
   if (!fontOptions.some((o) => o[0] === s.fontFamily)) fontOptions.unshift([s.fontFamily, s.fontFamily]);
   return (
     <>

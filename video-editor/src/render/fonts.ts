@@ -39,9 +39,42 @@ export const SYSTEM_FONTS: { family: string; label: string }[] = [
   { family: 'serif', label: '端末標準明朝' },
 ];
 
+/**
+ * アプリに同梱しているフォント (public/fonts)。選ばれたときだけ読み込む。
+ * ライセンス: 各フォントの *-OFL.txt (SIL Open Font License 1.1)
+ */
+export const BUNDLED_FONTS: { family: string; label: string; file: string }[] = [{ family: 'AbashiriMincho', label: '網走明朝 (極太明朝)', file: 'fonts/AbashiriMincho.woff2' }];
+
 const loaded = new Map<string, Promise<void>>();
+const done = new Set<string>();
+
+function loadBundled(def: { family: string; file: string }): Promise<void> {
+  return (async () => {
+    try {
+      const res = await fetch(new URL(def.file, document.baseURI).href);
+      if (!res.ok) throw new Error('HTTP ' + res.status);
+      const buf = await res.arrayBuffer();
+      // どの太さで指定されても同じ字形を使う (疑似ボールドを防ぐ)
+      const face = new FontFace(def.family, buf, { weight: '100 900' });
+      await face.load();
+      (document.fonts as any).add(face);
+    } catch (e) {
+      console.warn('同梱フォントを読み込めませんでした', def.family, e);
+    }
+    done.add(def.family);
+  })();
+}
 
 export function ensureWebFont(family: string): Promise<void> {
+  const bundled = BUNDLED_FONTS.find((f) => f.family === family);
+  if (bundled) {
+    let p = loaded.get(family);
+    if (!p) {
+      p = loadBundled(bundled);
+      loaded.set(family, p);
+    }
+    return p;
+  }
   const def = WEB_FONTS.find((f) => f.family === family);
   if (!def) return Promise.resolve();
   let p = loaded.get(family);
@@ -66,5 +99,6 @@ export function ensureWebFont(family: string): Promise<void> {
 }
 
 export function webFontReady(family: string): boolean {
+  if (BUNDLED_FONTS.some((f) => f.family === family)) return done.has(family);
   return !WEB_FONTS.some((f) => f.family === family) || loaded.has(family);
 }
