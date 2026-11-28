@@ -3,11 +3,13 @@ import type { CharAnimation, Clip, Ease, EffectType, Project, TextStyle, Transit
 import { createClip, createEffect, defaultCurves, defaultParticles, defaultShape, defaultTextStyle, uid } from '../model/defaults';
 import { findFreeTrack } from '../model/ops';
 import { YMM4_TEMPLATES } from './ymm4';
+import { getPresetOverride, usePresetStore, USER_PREFIX, type UserTextPreset } from './userPresets';
 
-export type PresetCategory = 'ymm4' | 'tv' | 'science' | 'space' | 'neon' | 'news' | 'cinema' | 'gold' | 'kinetic' | 'shorts' | 'tiktok';
+export type PresetCategory = 'mine' | 'ymm4' | 'tv' | 'science' | 'space' | 'neon' | 'news' | 'cinema' | 'gold' | 'kinetic' | 'shorts' | 'tiktok';
 export type PresetKind = 'text' | 'anim' | 'effect' | 'look' | 'template';
 
 export const CATEGORY_LABELS: Record<PresetCategory, string> = {
+  mine: 'マイプリセット',
   ymm4: 'YMM4テンプレ',
   tv: 'テレビ番組風',
   science: '科学解説風',
@@ -79,7 +81,12 @@ const textPreset = (id: string, name: string, category: PresetCategory, style: T
   category,
   kind: 'text',
   swatch: style.fill.color,
-  apply: (c) => applyStyle(c, JSON.parse(JSON.stringify(style)), anims && JSON.parse(JSON.stringify(anims))),
+  apply: (c) => {
+    // 利用者が上書き保存していれば、そのデザインを使う
+    const o = getPresetOverride(id);
+    applyStyle(c, JSON.parse(JSON.stringify(o?.style ?? style)), (o?.anims ?? anims) && JSON.parse(JSON.stringify(o?.anims ?? anims)));
+    if (c.type === 'text' && c.text) c.text.presetId = id;
+  },
 });
 
 // ---------- テロップ (テキストスタイル) ----------
@@ -623,4 +630,28 @@ export function textStyleOf(c: Clip): { style: TextStyle; anims: CharAnimation[]
   if (c.type === 'text' && c.text) return { style: JSON.parse(JSON.stringify(c.text.style)), anims: JSON.parse(JSON.stringify(c.text.anims)) };
   if (c.type === 'counter' && c.counter) return { style: JSON.parse(JSON.stringify(c.counter.style)), anims: [] };
   return null;
+}
+
+// ---------- マイプリセット ----------
+export function userPresetToPreset(u: UserTextPreset): Preset {
+  return {
+    id: USER_PREFIX + u.id,
+    name: u.name,
+    category: 'mine',
+    kind: 'text',
+    swatch: u.style.fill.color,
+    apply: (c) => {
+      applyStyle(c, JSON.parse(JSON.stringify(u.style)), JSON.parse(JSON.stringify(u.anims ?? [])));
+      if (c.type === 'text' && c.text) c.text.presetId = USER_PREFIX + u.id;
+    },
+  };
+}
+
+/** 標準プリセットまたはマイプリセットを ID で探す */
+export function findPreset(id: string): Preset | undefined {
+  if (id.startsWith(USER_PREFIX)) {
+    const u = usePresetStore.getState().mine.find((x) => USER_PREFIX + x.id === id);
+    return u ? userPresetToPreset(u) : undefined;
+  }
+  return PRESETS.find((p) => p.id === id);
 }

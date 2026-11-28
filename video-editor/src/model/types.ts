@@ -241,6 +241,8 @@ export interface TextData {
   content: string;
   style: TextStyle;
   anims: CharAnimation[];
+  /** 元にしたプリセット (標準: プリセット ID / マイプリセット: "user:<id>")。上書き保存の対象 */
+  presetId?: string;
 }
 
 export type ShapeKind =

@@ -2,6 +2,7 @@ import { createRoot } from 'react-dom/client';
 import { App } from './App';
 import './styles.css';
 import { inArtifact } from './ui/platform';
+import { loadPresetStore } from './presets/userPresets';
 import * as store from './store/store';
 import * as actions from './ui/actions';
 import { engine } from './ui/engine';
@@ -35,6 +36,9 @@ if (!inArtifact && 'serviceWorker' in navigator && location.protocol === 'https:
     navigator.serviceWorker.register('./sw.js').catch((e) => console.warn('SW registration failed', e));
   });
 }
+
+// 上書き保存したプリセットを起動時に読み込む
+void loadPresetStore().catch(() => {});
 
 // 自動テスト・デバッグ用ハンドル (動作には影響しない)
 (window as any).__MVE__ = { store, actions, engine, defaults, Compositor, ExportFrameSource, proxy, registry, audioDebug, audioOf, decodeSegmentWith, targetDebug, presets, renderText, ensureWebFont, YMM4_TEMPLATES };

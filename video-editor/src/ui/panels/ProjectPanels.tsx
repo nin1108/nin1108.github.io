@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import { useStore, flushSave } from '../../store/store';
-import { CATEGORY_LABELS, KIND_LABELS, PRESETS, type PresetCategory, type PresetKind } from '../../presets/presets';
+import { CATEGORY_LABELS, KIND_LABELS, PRESETS, userPresetToPreset, type PresetCategory, type PresetKind } from '../../presets/presets';
 import { applyPreset, downloadBlob, exportSRT, importSRT, selected } from '../actions';
 import { Chips, ColorField, Section, Slider, Toggle } from '../controls';
 import { formatTime, projectDuration } from '../../model/ops';
@@ -11,6 +11,7 @@ import { normalizeProject } from '../../model/defaults';
 import { Icon } from '../icons';
 import { askConfirm } from '../dialog';
 import { PresetThumb } from './PresetThumb';
+import { loadPresetStore, usePresetStore, USER_PREFIX } from '../../presets/userPresets';
 import { inArtifact } from '../platform';
 import { engine } from '../engine';
 
@@ -20,11 +21,18 @@ export function PresetsPanel() {
   const [cat, setCat] = useState<PresetCategory | 'all'>('all');
   const [kind, setKind] = useState<PresetKind | 'all'>('all');
   useStore((s) => s.selection);
-  const list = PRESETS.filter((p) => (cat === 'all' || p.category === cat) && (kind === 'all' || p.kind === kind));
+  const mine = usePresetStore((s) => s.mine);
+  const overrides = usePresetStore((s) => s.overrides);
+  useEffect(() => {
+    void loadPresetStore();
+  }, []);
+  const all = [...mine.map(userPresetToPreset), ...PRESETS];
+  const list = all.filter((p) => (cat === 'all' || p.category === cat) && (kind === 'all' || p.kind === kind));
+  const versionOf = (p: (typeof all)[number]) => overrides[p.id]?.savedAt ?? mine.find((m) => USER_PREFIX + m.id === p.id)?.updatedAt;
   const clip = selected();
   return (
     <div className="panel-body">
-      <p className="hint">全 {PRESETS.length} 種類。{clip ? `選択中「${clip.name}」に適用します。テンプレートは再生ヘッド位置に追加されます。` : 'クリップ未選択時: テロップは新規テキスト、カラー/エフェクトは調整レイヤーとして追加します。'}</p>
+      <p className="hint">全 {all.length} 種類。{clip ? `選択中「${clip.name}」に適用します。テンプレートは再生ヘッド位置に追加されます。` : 'クリップ未選択時: テロップは新規テキスト、カラー/エフェクトは調整レイヤーとして追加します。'}</p>
       <div className="scroll-chips">
         <Chips value={kind} options={[['all', 'すべて'], ...(Object.entries(KIND_LABELS) as [PresetKind, string][])]} onChange={setKind} />
       </div>
@@ -34,7 +42,8 @@ export function PresetsPanel() {
       <div className="preset-grid">
         {list.map((p) => (
           <button key={p.id} className={'preset ' + p.kind} onClick={() => applyPreset(p.id)}>
-            {p.kind === 'text' ? <PresetThumb preset={p} /> : <span className="preset-kind">{KIND_LABELS[p.kind]}</span>}
+            {p.kind === 'text' ? <PresetThumb preset={p} version={versionOf(p)} /> : <span className="preset-kind">{KIND_LABELS[p.kind]}</span>}
+            {overrides[p.id] && <span className="badge">編集済み</span>}
             <span className={'preset-name' + (p.kind === 'text' ? ' small' : '')}>{p.name}</span>
             <span className="preset-cat">{CATEGORY_LABELS[p.category]}</span>
           </button>

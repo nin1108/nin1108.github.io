@@ -1,14 +1,15 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useRef } from 'react';
 import { useStore } from '../../store/store';
 import type { CharAnimKind, CharAnimation, Clip, TextStyle } from '../../model/types';
 import { ColorField, ParamColor, ParamSlider, Section, Select, Slider, Toggle, Chips } from '../controls';
 import { liveClip, updateClip } from '../params';
 import { BUNDLED_FONTS, SYSTEM_FONTS, WEB_FONTS, ensureWebFont } from '../../render/fonts';
 import { importFile, ACCEPT_FONT } from '../../media/import';
-import { getMeta, putMeta } from '../../storage/db';
 import { EASE_LABELS } from '../../model/keyframes';
-import { uid } from '../../model/defaults';
 import { Icon } from '../icons';
+import { addUserPreset, clearPresetOverride, deleteUserPreset, loadPresetStore, overwriteUserPreset, setPresetOverride, usePresetStore, USER_PREFIX } from '../../presets/userPresets';
+import { PRESETS, userPresetToPreset } from '../../presets/presets';
+import { PresetThumb } from './PresetThumb';
 import { askConfirm, askText } from '../dialog';
 
 const st = () => useStore.getState();
@@ -29,16 +30,8 @@ const ANIM_KINDS: [CharAnimKind, string][] = [
   ['colorWave', '色変化 (継続)'],
 ];
 
-export interface UserTextPreset {
-  id: string;
-  name: string;
-  style: TextStyle;
-  anims: CharAnimation[];
-}
-
-export async function loadUserPresets(): Promise<UserTextPreset[]> {
-  return ((await getMeta<UserTextPreset[]>('textPresets').catch(() => undefined)) ?? []) as UserTextPreset[];
-}
+export type { UserTextPreset } from '../../presets/userPresets';
+export { loadUserPresets } from '../../presets/userPresets';
 
 /** text クリップは text.style、counter クリップは counter.style を編集 */
 export function StyleEditor({ clip, base }: { clip: Clip; base: 'text' | 'counter' }) {
@@ -193,20 +186,98 @@ function AnimEditor({ clip }: { clip: Clip }) {
   );
 }
 
-export function TextPanel({ clip }: { clip: Clip }) {
-  const [presets, setPresets] = useState<UserTextPreset[]>([]);
+/** 元にしたプリセットへの上書き保存・新規保存・マイプリセットの管理 */
+function PresetSaveSection({ clip }: { clip: Clip }) {
+  const mine = usePresetStore((s) => s.mine);
+  const overrides = usePresetStore((s) => s.overrides);
   useEffect(() => {
-    void loadUserPresets().then(setPresets);
+    void loadPresetStore();
   }, []);
-  if (clip.type !== 'text' || !clip.text) return <div className="panel-body">テキストクリップを選択してください</div>;
-  const savePreset = async () => {
-    const name = await askText('プリセット名', clip.text!.content.slice(0, 10) || 'マイテロップ');
-    if (!name) return;
-    const list = [...presets, { id: uid(), name, style: JSON.parse(JSON.stringify(clip.text!.style)), anims: JSON.parse(JSON.stringify(clip.text!.anims)) }];
-    await putMeta('textPresets', list);
-    setPresets(list);
-    st().showToast('テロッププリセットを保存しました', 'ok');
+  const td = clip.text!;
+  const srcId = td.presetId;
+  const isUser = !!srcId?.startsWith(USER_PREFIX);
+  const userSrc = isUser ? mine.find((m) => USER_PREFIX + m.id === srcId) : undefined;
+  const builtin = srcId && !isUser ? PRESETS.find((p) => p.id === srcId) : undefined;
+  const srcName = userSrc?.name ?? builtin?.name;
+  const overridden = !!(srcId && overrides[srcId]);
+
+  const overwrite = async () => {
+    if (!srcId || !srcName) return;
+    const ok = await askConfirm(`「${srcName}」に上書き保存しますか？`, builtin ? '標準のプリセットが今のデザインに置き換わります (あとで「標準のデザインに戻す」で戻せます)。' : 'マイプリセットが今のデザインに置き換わります。', { okLabel: '上書き保存' });
+    if (!ok) return;
+    if (userSrc) await overwriteUserPreset(userSrc.id, td.style, td.anims);
+    else await setPresetOverride(srcId, td.style, td.anims);
+    st().showToast(`「${srcName}」に上書き保存しました`, 'ok');
   };
+  const saveNew = async () => {
+    const name = await askText('新しいプリセットの名前', srcName ? `${srcName.replace(/^\d+\s*/, '')} (改)` : td.content.slice(0, 10) || 'マイテロップ');
+    if (!name) return;
+    const id = await addUserPreset(name, td.style, td.anims);
+    // 以後の上書き保存はこの新しいプリセットが対象
+    updateClip(clip.id, (c) => (c.text!.presetId = USER_PREFIX + id));
+    st().showToast(`「${name}」をマイプリセットに保存しました`, 'ok');
+  };
+  const resetBuiltin = async () => {
+    if (!srcId || !builtin) return;
+    if (!(await askConfirm(`「${builtin.name}」を標準のデザインに戻しますか？`, '上書き保存した内容が消えます。このクリップの見た目は変わりません。', { okLabel: '標準に戻す', danger: true }))) return;
+    await clearPresetOverride(srcId);
+    st().showToast('標準のデザインに戻しました', 'ok');
+  };
+  const applyMine = (u: (typeof mine)[number]) =>
+    updateClip(clip.id, (c) => {
+      c.text!.style = JSON.parse(JSON.stringify(u.style));
+      c.text!.anims = JSON.parse(JSON.stringify(u.anims ?? []));
+      c.text!.presetId = USER_PREFIX + u.id;
+    });
+  const removeMine = async (u: (typeof mine)[number]) => {
+    if (!(await askConfirm(`マイプリセット「${u.name}」を削除しますか？`, 'この操作は取り消せません。使用中のテロップの見た目は変わりません。', { okLabel: '削除', danger: true }))) return;
+    await deleteUserPreset(u.id);
+    if (srcId === USER_PREFIX + u.id) updateClip(clip.id, (c) => (c.text!.presetId = undefined));
+  };
+
+  return (
+    <Section title="プリセットに保存">
+      {srcName ? (
+        <p className="row-info">
+          元のプリセット: <b>{srcName}</b>
+          {overridden && <span className="badge">編集済み</span>}
+        </p>
+      ) : (
+        <p className="hint">プリセットから作ったテロップは、編集後に元のプリセットへ上書き保存できます。</p>
+      )}
+      <div className="btn-row">
+        {srcName && (
+          <button className="accent" onClick={overwrite}>
+            「{srcName}」に上書き保存
+          </button>
+        )}
+        <button onClick={saveNew}>新しいプリセットとして保存</button>
+        {builtin && overridden && <button onClick={resetBuiltin}>標準のデザインに戻す</button>}
+      </div>
+      {mine.length > 0 && (
+        <>
+          <div className="fx-group-title">マイプリセット</div>
+          <div className="mine-list">
+            {mine.map((u) => (
+              <div key={u.id} className={'mine-item' + (srcId === USER_PREFIX + u.id ? ' on' : '')}>
+                <button className="mine-apply" onClick={() => applyMine(u)}>
+                  <PresetThumb preset={userPresetToPreset(u)} version={u.updatedAt} />
+                  <span>{u.name}</span>
+                </button>
+                <button className="mini" aria-label={`${u.name} を削除`} onClick={() => removeMine(u)}>
+                  <Icon name="trash" size={14} />
+                </button>
+              </div>
+            ))}
+          </div>
+        </>
+      )}
+    </Section>
+  );
+}
+
+export function TextPanel({ clip }: { clip: Clip }) {
+  if (clip.type !== 'text' || !clip.text) return <div className="panel-body">テキストクリップを選択してください</div>;
   return (
     <div className="panel-body">
       <textarea
@@ -216,30 +287,7 @@ export function TextPanel({ clip }: { clip: Clip }) {
         placeholder="テキストを入力"
         onChange={(e) => updateClip(clip.id, (c) => (c.text!.content = e.target.value), 'content')}
       />
-      {presets.length > 0 && (
-        <Section title="マイプリセット">
-          <div className="grid-buttons">
-            {presets.map((pr) => (
-              <button key={pr.id} onClick={() => updateClip(clip.id, (c) => {
-                c.text!.style = JSON.parse(JSON.stringify(pr.style));
-                c.text!.anims = JSON.parse(JSON.stringify(pr.anims));
-              })} onContextMenu={async (e) => {
-                e.preventDefault();
-                if (!(await askConfirm(`プリセット「${pr.name}」を削除しますか？`, undefined, { okLabel: '削除', danger: true }))) return;
-                const list = presets.filter((x) => x.id !== pr.id);
-                await putMeta('textPresets', list);
-                setPresets(list);
-              }}>
-                {pr.name}
-              </button>
-            ))}
-          </div>
-          <p className="hint">長押し (右クリック) で削除できます。</p>
-        </Section>
-      )}
-      <button className="wide" onClick={savePreset}>
-        このデザインをプリセットとして保存
-      </button>
+      <PresetSaveSection clip={clip} />
       <StyleEditor clip={clip} base="text" />
       <AnimEditor clip={clip} />
     </div>

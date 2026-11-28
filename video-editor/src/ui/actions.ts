@@ -4,7 +4,7 @@ import { createClip, createEffect, defaultParticles, defaultShape } from '../mod
 import { clipEnd, closeGaps, deleteClips, detachAudio, duplicateClip, findFreeTrack, frameSnap, groupClips, splitClip, ungroup } from '../model/ops';
 import { importFile } from '../media/import';
 import { buildSRT, decodeText, parseSRT } from '../model/srt';
-import { PRESETS } from '../presets/presets';
+import { findPreset } from '../presets/presets';
 import { findClip } from './params';
 import { saveFile } from './platform';
 
@@ -191,7 +191,7 @@ export function closeTrackGaps() {
 
 export function applyPreset(id: string) {
   const s = st();
-  const pr = PRESETS.find((x) => x.id === id);
+  const pr = findPreset(id);
   if (!pr) return;
   if (pr.build) {
     s.update((p) => pr.build!(p, frameSnap(s.time, p.fps)));

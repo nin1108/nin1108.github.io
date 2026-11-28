@@ -8,8 +8,8 @@ import { ensureWebFont } from '../../render/fonts';
 
 const cache = new Map<string, string>();
 
-async function makeThumb(p: Preset): Promise<string> {
-  const hit = cache.get(p.id);
+async function makeThumb(p: Preset, key: string): Promise<string> {
+  const hit = cache.get(key);
   if (hit) return hit;
   const tmp = { type: 'text', text: { content: '', style: defaultTextStyle(), anims: [] } } as unknown as Clip;
   p.apply!(tmp, {} as any);
@@ -23,18 +23,22 @@ async function makeThumb(p: Preset): Promise<string> {
   // 見本はサイズを揃えて描く (プリセット本来の大きさの比率は保つ)
   const r = renderText(undefined, 'あア', st, [], 0, 1, 0.42);
   const url = r.canvas.toDataURL('image/png');
-  cache.set(p.id, url);
+  cache.set(key, url);
   return url;
 }
 
-export function PresetThumb({ preset }: { preset: Preset }) {
-  const [url, setUrl] = useState<string | null>(cache.get(preset.id) ?? null);
+/** version: 上書き保存した時刻など。変わると見本を描き直す */
+export function PresetThumb({ preset, version }: { preset: Preset; version?: number }) {
+  const key = preset.id + '@' + (version ?? 0);
+  const [url, setUrl] = useState<string | null>(cache.get(key) ?? null);
   useEffect(() => {
     let alive = true;
-    if (!url) void makeThumb(preset).then((u) => alive && setUrl(u)).catch(() => {});
+    const hit = cache.get(key);
+    if (hit) setUrl(hit);
+    else void makeThumb(preset, key).then((u) => alive && setUrl(u)).catch(() => {});
     return () => {
       alive = false;
     };
-  }, [preset.id]);
+  }, [key]);
   return <span className="preset-thumb">{url ? <img src={url} alt="" /> : <span className="preset-thumb-ph">あア</span>}</span>;
 }
